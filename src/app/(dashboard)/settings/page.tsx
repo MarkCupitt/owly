@@ -17,6 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
+import { PROVIDER_CONFIGS } from "@/lib/ai/provider-configs";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,6 +32,7 @@ interface SettingsData {
   aiProvider: string;
   aiModel: string;
   aiApiKey: string;
+  aiBaseUrl: string;
   maxTokens: number;
   temperature: number;
   elevenLabsKey: string;
@@ -82,7 +84,7 @@ const tabs: TabDef[] = [
 // Which fields belong to each section (used for partial saves)
 const sectionFields: Record<SectionKey, (keyof SettingsData)[]> = {
   general: ["businessName", "businessDesc", "welcomeMessage", "tone", "language"],
-  ai: ["aiProvider", "aiModel", "aiApiKey", "maxTokens", "temperature"],
+  ai: ["aiProvider", "aiModel", "aiApiKey", "aiBaseUrl", "maxTokens", "temperature"],
   voice: ["elevenLabsKey", "elevenLabsVoice"],
   phone: ["twilioSid", "twilioToken", "twilioPhone"],
   email: [
@@ -427,23 +429,41 @@ function AISection({
   data: SettingsData;
   update: (field: keyof SettingsData, value: string | number) => void;
 }) {
-  const modelOptions: Record<string, { value: string; label: string }[]> = {
-    openai: [
-      { value: "gpt-4o", label: "GPT-4o" },
-      { value: "gpt-4o-mini", label: "GPT-4o Mini" },
-      { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
-    ],
-    claude: [
-      { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
-      { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
-      { value: "claude-3-haiku-20240307", label: "Claude 3 Haiku" },
-    ],
-    ollama: [
-      { value: "llama3", label: "Llama 3" },
-      { value: "mistral", label: "Mistral" },
-      { value: "codellama", label: "Code Llama" },
-    ],
-  };
+  const [dynamicModels, setDynamicModels] = useState<{ value: string; label: string; vision?: boolean }[] | null>(null);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [customModel, setCustomModel] = useState(false);
+
+  const providerConfig = PROVIDER_CONFIGS[data.aiProvider];
+  const staticModels = providerConfig?.models || [];
+  const modelOptions = dynamicModels || staticModels;
+  const showCustomModel = customModel || (data.aiModel && !modelOptions.some((m) => m.value === data.aiModel));
+
+  const providerOptions = Object.entries(PROVIDER_CONFIGS).map(([key, cfg]) => ({
+    value: key,
+    label: key === "nvidia" ? "NVIDIA NIM" : key === "gemini" ? "Google Gemini" : key.charAt(0).toUpperCase() + key.slice(1),
+  }));
+
+  async function handleFetchModels() {
+    if (data.aiProvider !== "nvidia" || !data.aiApiKey) return;
+    setFetchingModels(true);
+    try {
+      const res = await fetch("/api/ai/models", {
+        headers: { "x-api-key": data.aiApiKey },
+      });
+      if (!res.ok) throw new Error("Failed to fetch");
+      const json = await res.json();
+      setDynamicModels(json.models);
+    } catch {
+      setDynamicModels(null);
+    } finally {
+      setFetchingModels(false);
+    }
+  }
+
+  useEffect(() => {
+    setDynamicModels(null);
+    setCustomModel(false);
+  }, [data.aiProvider]);
 
   return (
     <div className="space-y-5">
@@ -452,34 +472,67 @@ function AISection({
           value={data.aiProvider}
           onChange={(v) => {
             update("aiProvider", v);
-            const models = modelOptions[v];
-            if (models && models.length > 0) {
-              update("aiModel", models[0].value);
+            const cfg = PROVIDER_CONFIGS[v];
+            if (cfg?.models?.length) {
+              update("aiModel", cfg.models[0].value);
             }
+            update("aiBaseUrl", "");
           }}
-          options={[
-            { value: "openai", label: "OpenAI" },
-            { value: "claude", label: "Claude (Anthropic)" },
-            { value: "ollama", label: "Ollama (Local)" },
-          ]}
+          options={providerOptions}
         />
       </FormField>
       <FormField label="Model" description="The specific model to use for AI responses.">
-        <SelectInput
-          value={data.aiModel}
-          onChange={(v) => update("aiModel", v)}
-          options={modelOptions[data.aiProvider] || []}
-        />
+        {!showCustomModel ? (
+          <SelectInput
+            value={data.aiModel}
+            onChange={(v) => update("aiModel", v)}
+            options={modelOptions}
+          />
+        ) : (
+          <TextInput
+            value={data.aiModel}
+            onChange={(v) => update("aiModel", v)}
+            placeholder="Enter model ID (e.g. nvidia/llama-3.3-nemotron-super-49b-v1)"
+          />
+        )}
+        <div className="flex items-center gap-3 mt-2">
+          <label className="flex items-center gap-1.5 text-xs text-owly-text-light cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showCustomModel}
+              onChange={(e) => setCustomModel(e.target.checked)}
+              className="accent-owly-primary"
+            />
+            Custom model ID
+          </label>
+          {data.aiProvider === "nvidia" && !showCustomModel && (
+            <button
+              type="button"
+              onClick={handleFetchModels}
+              disabled={fetchingModels || !data.aiApiKey}
+              className="text-xs text-owly-primary hover:text-owly-primary-dark disabled:opacity-50"
+            >
+              {fetchingModels ? "Fetching..." : dynamicModels ? "Refresh models" : "Fetch all available models"}
+            </button>
+          )}
+        </div>
       </FormField>
-      <FormField label="API Key" description="Your provider API key. Not required for Ollama.">
+      <FormField label="API Key" description={providerConfig?.apiKeyRequired === false ? "Not required for this provider." : "Your provider API key."}>
         <PasswordInput
           value={data.aiApiKey}
           onChange={(v) => update("aiApiKey", v)}
           placeholder={
-            data.aiProvider === "ollama"
+            providerConfig?.apiKeyRequired === false
               ? "Not required for local models"
               : "Enter your API key"
           }
+        />
+      </FormField>
+      <FormField label="Custom Base URL" description="Override the default API endpoint. Leave empty to use the provider's default.">
+        <TextInput
+          value={data.aiBaseUrl}
+          onChange={(v) => update("aiBaseUrl", v)}
+          placeholder={providerConfig?.baseURL || "https://api.openai.com/v1"}
         />
       </FormField>
       <FormField label="Max Tokens" description="Maximum number of tokens per AI response.">
@@ -741,6 +794,7 @@ const defaultSettings: SettingsData = {
   aiProvider: "openai",
   aiModel: "gpt-4o-mini",
   aiApiKey: "",
+  aiBaseUrl: "",
   maxTokens: 2048,
   temperature: 0.7,
   elevenLabsKey: "",
