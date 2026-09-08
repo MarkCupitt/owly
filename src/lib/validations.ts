@@ -172,6 +172,11 @@ export const updateSettingsSchema = z.object({
   whatsappMode: z.string().max(50).optional(),
   whatsappApiKey: z.string().max(500).optional(),
   whatsappPhone: z.string().max(50).optional(),
+  themePreset: z.string().max(50).optional(),
+  themeOverrides: z.record(z.string(), z.string()).optional(),
+  themeLogoUrl: z.string().max(2000).optional(),
+  themeLogoDarkUrl: z.string().max(2000).optional(),
+  themeFaviconUrl: z.string().max(2000).optional(),
 }).strict();
 
 // Canned Responses

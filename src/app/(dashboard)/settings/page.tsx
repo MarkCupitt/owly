@@ -15,9 +15,12 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  Palette,
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { PROVIDER_CONFIGS } from "@/lib/ai/provider-configs";
+import { THEME_PRESETS } from "@/lib/theme/presets";
+import { useThemeAppearance } from "@/lib/hooks/use-theme-appearance";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +55,11 @@ interface SettingsData {
   whatsappMode: string;
   whatsappApiKey: string;
   whatsappPhone: string;
+  themePreset: string;
+  themeOverrides: Record<string, string>;
+  themeLogoUrl: string;
+  themeLogoDarkUrl: string;
+  themeFaviconUrl: string;
 }
 
 type SectionKey =
@@ -60,7 +68,8 @@ type SectionKey =
   | "voice"
   | "phone"
   | "email"
-  | "whatsapp";
+  | "whatsapp"
+  | "appearance";
 
 interface TabDef {
   key: SectionKey;
@@ -79,6 +88,7 @@ const tabs: TabDef[] = [
   { key: "phone", label: "Phone (Twilio)", icon: Phone },
   { key: "email", label: "Email (SMTP/IMAP)", icon: Mail },
   { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { key: "appearance", label: "Appearance", icon: Palette },
 ];
 
 // Which fields belong to each section (used for partial saves)
@@ -99,6 +109,7 @@ const sectionFields: Record<SectionKey, (keyof SettingsData)[]> = {
     "imapPass",
   ],
   whatsapp: ["whatsappMode", "whatsappApiKey", "whatsappPhone"],
+  appearance: ["themePreset", "themeOverrides", "themeLogoUrl", "themeLogoDarkUrl", "themeFaviconUrl"],
 };
 
 // ---------------------------------------------------------------------------
@@ -782,6 +793,172 @@ function WhatsAppSection({
 }
 
 // ---------------------------------------------------------------------------
+// Appearance section
+// ---------------------------------------------------------------------------
+
+function AppearanceSection({
+  data,
+  update,
+}: {
+  data: SettingsData;
+  update: (field: keyof SettingsData, value: string | number) => void;
+}) {
+  const { setAppearance } = useThemeAppearance();
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const colorVarNames = [
+    "--owly-primary", "--owly-primary-dark", "--owly-primary-light",
+    "--owly-primary-50", "--owly-primary-100", "--owly-accent",
+    "--owly-accent-light", "--owly-bg", "--owly-surface",
+    "--owly-text", "--owly-text-light", "--owly-border",
+    "--owly-sidebar", "--owly-sidebar-hover", "--owly-sidebar-active",
+    "--owly-success", "--owly-warning", "--owly-danger",
+  ];
+
+  function applyAppearance() {
+    setAppearance({
+      themePreset: data.themePreset,
+      themeOverrides: data.themeOverrides,
+      themeLogoUrl: data.themeLogoUrl,
+      themeLogoDarkUrl: data.themeLogoDarkUrl,
+      themeFaviconUrl: data.themeFaviconUrl,
+    });
+  }
+
+  return (
+    <div className="space-y-5">
+      <FormField label="Theme Preset" description="Choose a color theme for your Owly instance.">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+          {THEME_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => {
+                update("themePreset", preset.id);
+                update("themeOverrides", {});
+                setTimeout(applyAppearance, 0);
+              }}
+              className={`rounded-lg border p-3 text-left transition-all ${
+                data.themePreset === preset.id
+                  ? "border-owly-primary ring-1 ring-owly-primary bg-owly-primary-50"
+                  : "border-owly-border hover:border-owly-primary-light"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className="w-5 h-5 rounded-full border border-owly-border"
+                  style={{ backgroundColor: preset.colors.light["--owly-primary"] }}
+                />
+                <span
+                  className="w-5 h-5 rounded-full border border-owly-border"
+                  style={{ backgroundColor: preset.colors.light["--owly-accent"] }}
+                />
+                <span
+                  className="w-5 h-5 rounded-full border border-owly-border"
+                  style={{ backgroundColor: preset.colors.light["--owly-sidebar"] }}
+                />
+              </div>
+              <div className="text-sm font-medium text-owly-text">{preset.name}</div>
+            </button>
+          ))}
+        </div>
+      </FormField>
+
+      <FormField label="Branding" description="Customize your logo and favicon. Leave empty to use the default Owly branding.">
+        <div className="space-y-3 mt-2">
+          <div>
+            <label className="block text-xs font-medium text-owly-text-light mb-1">Logo URL (light mode)</label>
+            <TextInput
+              value={data.themeLogoUrl}
+              onChange={(v) => update("themeLogoUrl", v)}
+              placeholder="/owly.png or https://example.com/logo.png"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-owly-text-light mb-1">Logo URL (dark mode, optional)</label>
+            <TextInput
+              value={data.themeLogoDarkUrl}
+              onChange={(v) => update("themeLogoDarkUrl", v)}
+              placeholder="Leave empty to use same logo"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-owly-text-light mb-1">Favicon URL</label>
+            <TextInput
+              value={data.themeFaviconUrl}
+              onChange={(v) => update("themeFaviconUrl", v)}
+              placeholder="/owly.png or https://example.com/favicon.ico"
+            />
+          </div>
+        </div>
+      </FormField>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center gap-1.5 text-sm font-medium text-owly-primary hover:text-owly-primary-dark"
+        >
+          {showAdvanced ? "Hide" : "Show"} Advanced Color Customization
+        </button>
+      </div>
+
+      {showAdvanced && (
+        <div className="space-y-3 rounded-lg border border-owly-border p-4 bg-owly-bg">
+          <p className="text-xs text-owly-text-light">
+            Override individual colors on top of the selected preset. Changes apply on save.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {colorVarNames.map((varName) => {
+              const currentOverride = (data.themeOverrides as Record<string, string>)[varName] || "";
+              return (
+                <div key={varName} className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={currentOverride || ""}
+                    onChange={(e) => {
+                      const newOverrides = { ...data.themeOverrides };
+                      if (e.target.value) {
+                        newOverrides[varName] = e.target.value;
+                      } else {
+                        delete newOverrides[varName];
+                      }
+                      update("themeOverrides", newOverrides);
+                    }}
+                    className="h-8 w-12 rounded border border-owly-border cursor-pointer"
+                  />
+                  <span className="text-xs font-mono text-owly-text-light flex-1">{varName}</span>
+                  {currentOverride && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newOverrides = { ...data.themeOverrides };
+                        delete newOverrides[varName];
+                        update("themeOverrides", newOverrides);
+                      }}
+                      className="text-xs text-owly-danger hover:text-red-700"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => update("themeOverrides", {})}
+            className="text-xs text-owly-text-light hover:text-owly-text"
+          >
+            Reset all overrides to preset defaults
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main settings page
 // ---------------------------------------------------------------------------
 
@@ -814,6 +991,11 @@ const defaultSettings: SettingsData = {
   whatsappMode: "web",
   whatsappApiKey: "",
   whatsappPhone: "",
+  themePreset: "owly-default",
+  themeOverrides: {},
+  themeLogoUrl: "",
+  themeLogoDarkUrl: "",
+  themeFaviconUrl: "",
 };
 
 export default function SettingsPage() {
@@ -842,6 +1024,17 @@ export default function SettingsPage() {
           }
         }
         setData(merged);
+
+        if (settings.themePreset) {
+          const { setAppearance } = useThemeAppearance.getState();
+          setAppearance({
+            themePreset: settings.themePreset,
+            themeOverrides: settings.themeOverrides || {},
+            themeLogoUrl: settings.themeLogoUrl || "",
+            themeLogoDarkUrl: settings.themeLogoDarkUrl || "",
+            themeFaviconUrl: settings.themeFaviconUrl || "",
+          });
+        }
       })
       .catch(() => addToast("error", "Failed to load settings"))
       .finally(() => setLoading(false));
@@ -868,6 +1061,17 @@ export default function SettingsPage() {
 
       if (!res.ok) throw new Error("Save failed");
       addToast("success", "Settings saved successfully");
+
+      if (activeTab === "appearance") {
+        const { setAppearance } = useThemeAppearance.getState();
+        setAppearance({
+          themePreset: data.themePreset,
+          themeOverrides: data.themeOverrides,
+          themeLogoUrl: data.themeLogoUrl,
+          themeLogoDarkUrl: data.themeLogoDarkUrl,
+          themeFaviconUrl: data.themeFaviconUrl,
+        });
+      }
     } catch {
       addToast("error", "Failed to save settings. Please try again.");
     } finally {
@@ -882,6 +1086,7 @@ export default function SettingsPage() {
     phone: <PhoneSection data={data} update={update} />,
     email: <EmailSection data={data} update={update} />,
     whatsapp: <WhatsAppSection data={data} update={update} />,
+    appearance: <AppearanceSection data={data} update={update} />,
   };
 
   if (loading) {
@@ -942,6 +1147,8 @@ export default function SettingsPage() {
                   "Set up email sending and receiving for support tickets."}
                 {activeTab === "whatsapp" &&
                   "Configure WhatsApp integration for messaging support."}
+                {activeTab === "appearance" &&
+                  "Customize the look and feel of your Owly instance."}
               </p>
             </div>
 
