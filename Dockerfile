@@ -60,6 +60,8 @@ COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/prisma.config.ts ./
 
+RUN mkdir -p /app/public/uploads
+
 RUN chown -R nextjs:nodejs /app
 
 USER nextjs

@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const { themeLogoUrl } = useThemeAppearance();
+  const { themeLogoUrl, appName } = useThemeAppearance();
 
   useEffect(() => {
     async function checkAuth() {
@@ -82,7 +82,7 @@ export default function LoginPage() {
           unoptimized
         />
         <h1 className="text-2xl font-bold text-owly-text">
-          Welcome to Owly
+          Welcome to {appName || "Owly"}
         </h1>
         <p className="text-owly-text-light text-sm mt-1">
           Sign in to your account

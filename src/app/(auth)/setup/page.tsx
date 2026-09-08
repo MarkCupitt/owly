@@ -33,7 +33,7 @@ export default function SetupPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
-  const { themeLogoUrl } = useThemeAppearance();
+  const { themeLogoUrl, appName } = useThemeAppearance();
 
   // Step 1 - Admin Account
   const [name, setName] = useState("");
@@ -44,6 +44,8 @@ export default function SetupPage() {
   // Step 2 - Business Profile
   const [businessName, setBusinessName] = useState("");
   const [businessDesc, setBusinessDesc] = useState("");
+  const [appNameInput, setAppNameInput] = useState("");
+  const [appNameShortInput, setAppNameShortInput] = useState("");
   const [welcomeMessage, setWelcomeMessage] = useState("Hello! How can I help you today?");
   const [tone, setTone] = useState("friendly");
 
@@ -117,6 +119,8 @@ export default function SetupPage() {
         const body: Record<string, string> = {};
         if (businessName.trim()) body.businessName = businessName.trim();
         if (businessDesc.trim()) body.businessDesc = businessDesc.trim();
+        if (appNameInput.trim()) body.appName = appNameInput.trim();
+        if (appNameShortInput.trim()) body.appNameShort = appNameShortInput.trim();
         if (welcomeMessage.trim()) body.welcomeMessage = welcomeMessage.trim();
         body.tone = tone;
 
@@ -181,7 +185,7 @@ export default function SetupPage() {
         <div className="flex items-center gap-3 mb-5">
           <Image src={themeLogoUrl || "/owly.png"} alt="Owly" width={40} height={40} unoptimized />
           <div>
-            <h1 className="text-lg font-bold text-owly-text">Set Up Owly</h1>
+            <h1 className="text-lg font-bold text-owly-text">Set Up {appName || "Owly"}</h1>
             <p className="text-xs text-owly-text-light">
               Step {step + 1} of {STEPS.length}
             </p>
@@ -286,6 +290,20 @@ export default function SetupPage() {
                   className="w-full rounded-lg border border-owly-border bg-owly-bg px-3.5 py-2.5 text-sm text-owly-text placeholder:text-owly-text-light focus:outline-none focus:ring-2 focus:ring-owly-primary focus:border-transparent transition-shadow resize-none"
                 />
               </div>
+              <Field
+                id="appName"
+                label="Application Name (full)"
+                value={appNameInput}
+                onChange={setAppNameInput}
+                placeholder="e.g. PowerDeck Help Desk"
+              />
+              <Field
+                id="appNameShort"
+                label="Application Short Name"
+                value={appNameShortInput}
+                onChange={setAppNameShortInput}
+                placeholder="e.g. PowerDeck"
+              />
               <Field
                 id="welcomeMessage"
                 label="Welcome Message"

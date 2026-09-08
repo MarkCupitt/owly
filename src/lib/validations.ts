@@ -173,10 +173,13 @@ export const updateSettingsSchema = z.object({
   whatsappApiKey: z.string().max(500).optional(),
   whatsappPhone: z.string().max(50).optional(),
   themePreset: z.string().max(50).optional(),
-  themeOverrides: z.record(z.string(), z.string()).optional(),
-  themeLogoUrl: z.string().max(2000).optional(),
-  themeLogoDarkUrl: z.string().max(2000).optional(),
-  themeFaviconUrl: z.string().max(2000).optional(),
+  themeOverridesLight: z.record(z.string(), z.string().regex(/^#[0-9a-fA-F]{3,8}$|^rgb\(|^hsl\(/, "Must be a valid color (hex, rgb, or hsl)")).optional(),
+  themeOverridesDark: z.record(z.string(), z.string().regex(/^#[0-9a-fA-F]{3,8}$|^rgb\(|^hsl\(/, "Must be a valid color (hex, rgb, or hsl)")).optional(),
+  themeLogoUrl: z.string().max(2000).regex(/^$|^https?:\/\/|^\/[^\/]/, "Must be a URL starting with http://, https://, or /").optional(),
+  themeLogoDarkUrl: z.string().max(2000).regex(/^$|^https?:\/\/|^\/[^\/]/, "Must be a URL starting with http://, https://, or /").optional(),
+  themeFaviconUrl: z.string().max(2000).regex(/^$|^https?:\/\/|^\/[^\/]/, "Must be a URL starting with http://, https://, or /").optional(),
+  appName: z.string().max(100).optional(),
+  appNameShort: z.string().max(50).optional(),
 }).strict();
 
 // Canned Responses

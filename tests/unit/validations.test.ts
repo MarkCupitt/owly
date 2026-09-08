@@ -240,6 +240,105 @@ describe("Input Validation Schemas", () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it("should accept valid themeOverridesLight with hex colors", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeOverridesLight: { "--owly-primary": "#FF6B00" },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept valid themeOverridesDark with hex colors", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeOverridesDark: { "--owly-bg": "#0f1117", "--owly-primary": "#FF6B00" },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept rgb/hsl color values in theme overrides", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeOverridesLight: { "--owly-primary": "rgb(255, 107, 0)" },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject invalid color values in themeOverridesLight", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeOverridesLight: { "--owly-primary": "javascript:alert(1)" },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid color values in themeOverridesDark", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeOverridesDark: { "--owly-bg": "not-a-color" },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject old themeOverrides field (removed)", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeOverrides: { "--owly-primary": "#FF6B00" },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept valid theme logo URL with relative path", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeLogoUrl: "/uploads/logo.png",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept valid theme logo URL with https", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeLogoUrl: "https://example.com/logo.png",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject javascript: scheme in logo URL", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeLogoUrl: "javascript:alert(1)",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject data: scheme in favicon URL", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themeFaviconUrl: "data:text/html,<script>alert(1)</script>",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept valid themePreset", () => {
+      const result = validateBody(updateSettingsSchema, {
+        themePreset: "mono",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should accept appName and appNameShort", () => {
+      const result = validateBody(updateSettingsSchema, {
+        appName: "PowerDeck Help Desk",
+        appNameShort: "PowerDeck",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject appName exceeding 100 chars", () => {
+      const result = validateBody(updateSettingsSchema, {
+        appName: "x".repeat(101),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject appNameShort exceeding 50 chars", () => {
+      const result = validateBody(updateSettingsSchema, {
+        appNameShort: "x".repeat(51),
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
   describe("createCustomerSchema", () => {

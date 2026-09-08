@@ -18,8 +18,9 @@ import {
   Palette,
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
+import { useToast } from "@/components/ui/toast";
 import { PROVIDER_CONFIGS } from "@/lib/ai/provider-configs";
-import { THEME_PRESETS } from "@/lib/theme/presets";
+import { THEME_PRESETS, getPresetById } from "@/lib/theme/presets";
 import { useThemeAppearance } from "@/lib/hooks/use-theme-appearance";
 
 // ---------------------------------------------------------------------------
@@ -56,10 +57,13 @@ interface SettingsData {
   whatsappApiKey: string;
   whatsappPhone: string;
   themePreset: string;
-  themeOverrides: Record<string, string>;
+  themeOverridesLight: Record<string, string>;
+  themeOverridesDark: Record<string, string>;
   themeLogoUrl: string;
   themeLogoDarkUrl: string;
   themeFaviconUrl: string;
+  appName: string;
+  appNameShort: string;
 }
 
 type SectionKey =
@@ -93,7 +97,7 @@ const tabs: TabDef[] = [
 
 // Which fields belong to each section (used for partial saves)
 const sectionFields: Record<SectionKey, (keyof SettingsData)[]> = {
-  general: ["businessName", "businessDesc", "welcomeMessage", "tone", "language"],
+  general: ["businessName", "businessDesc", "appName", "appNameShort", "welcomeMessage", "tone", "language"],
   ai: ["aiProvider", "aiModel", "aiApiKey", "aiBaseUrl", "maxTokens", "temperature"],
   voice: ["elevenLabsKey", "elevenLabsVoice"],
   phone: ["twilioSid", "twilioToken", "twilioPhone"],
@@ -109,7 +113,7 @@ const sectionFields: Record<SectionKey, (keyof SettingsData)[]> = {
     "imapPass",
   ],
   whatsapp: ["whatsappMode", "whatsappApiKey", "whatsappPhone"],
-  appearance: ["themePreset", "themeOverrides", "themeLogoUrl", "themeLogoDarkUrl", "themeFaviconUrl"],
+  appearance: ["themePreset", "themeOverridesLight", "themeOverridesDark", "themeLogoUrl", "themeLogoDarkUrl", "themeFaviconUrl"],
 };
 
 // ---------------------------------------------------------------------------
@@ -374,7 +378,7 @@ function GeneralSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number) => void;
+  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -390,6 +394,20 @@ function GeneralSection({
           value={data.businessDesc}
           onChange={(v) => update("businessDesc", v)}
           placeholder="Describe what your business does..."
+        />
+      </FormField>
+      <FormField label="Application Name" description="Full name shown on login page, page titles, and descriptions.">
+        <TextInput
+          value={data.appName}
+          onChange={(v) => update("appName", v)}
+          placeholder="e.g. PowerDeck Help Desk"
+        />
+      </FormField>
+      <FormField label="Application Short Name" description="Short name shown in the sidebar header and tight spaces.">
+        <TextInput
+          value={data.appNameShort}
+          onChange={(v) => update("appNameShort", v)}
+          placeholder="e.g. PowerDeck"
         />
       </FormField>
       <FormField label="Welcome Message" description="The greeting message sent to new customers.">
@@ -438,16 +456,17 @@ function AISection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number) => void;
+  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
 }) {
   const [dynamicModels, setDynamicModels] = useState<{ value: string; label: string; vision?: boolean }[] | null>(null);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [customModel, setCustomModel] = useState(false);
+  const { toast } = useToast();
 
   const providerConfig = PROVIDER_CONFIGS[data.aiProvider];
   const staticModels = providerConfig?.models || [];
   const modelOptions = dynamicModels || staticModels;
-  const showCustomModel = customModel || (data.aiModel && !modelOptions.some((m) => m.value === data.aiModel));
+  const showCustomModel = customModel || (!!data.aiModel && !modelOptions.some((m) => m.value === data.aiModel));
 
   const providerOptions = Object.entries(PROVIDER_CONFIGS).map(([key, cfg]) => ({
     value: key,
@@ -466,6 +485,7 @@ function AISection({
       setDynamicModels(json.models);
     } catch {
       setDynamicModels(null);
+      toast({ type: "error", title: "Failed to fetch NVIDIA models", description: "Check your API key and try again." });
     } finally {
       setFetchingModels(false);
     }
@@ -575,7 +595,7 @@ function VoiceSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number) => void;
+  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -607,7 +627,7 @@ function PhoneSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number) => void;
+  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -646,7 +666,7 @@ function EmailSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number) => void;
+  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -751,7 +771,7 @@ function WhatsAppSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number) => void;
+  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -792,19 +812,18 @@ function WhatsAppSection({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Appearance section
-// ---------------------------------------------------------------------------
-
 function AppearanceSection({
   data,
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number) => void;
+  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
 }) {
   const { setAppearance } = useThemeAppearance();
+  const { toast } = useToast();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [overrideMode, setOverrideMode] = useState<"light" | "dark">("light");
+  const [uploading, setUploading] = useState<string | null>(null);
 
   const colorVarNames = [
     "--owly-primary", "--owly-primary-dark", "--owly-primary-light",
@@ -815,14 +834,64 @@ function AppearanceSection({
     "--owly-success", "--owly-warning", "--owly-danger",
   ];
 
-  function applyAppearance() {
+  function applyAppearance(presetId?: string, overridesLight?: Record<string, string>, overridesDark?: Record<string, string>) {
     setAppearance({
-      themePreset: data.themePreset,
-      themeOverrides: data.themeOverrides,
+      themePreset: presetId ?? data.themePreset,
+      themeOverridesLight: overridesLight ?? data.themeOverridesLight,
+      themeOverridesDark: overridesDark ?? data.themeOverridesDark,
       themeLogoUrl: data.themeLogoUrl,
       themeLogoDarkUrl: data.themeLogoDarkUrl,
       themeFaviconUrl: data.themeFaviconUrl,
+      appName: data.appName,
+      appNameShort: data.appNameShort,
     });
+  }
+
+  const currentPreset = getPresetById(data.themePreset);
+  const presetColors = currentPreset
+    ? (overrideMode === "light" ? currentPreset.colors.light : currentPreset.colors.dark)
+    : {};
+
+  async function handleUpload(file: File, field: "themeLogoUrl" | "themeLogoDarkUrl" | "themeFaviconUrl") {
+    setUploading(field);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/assets/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const json = await res.json();
+      update(field, json.path);
+      toast({ type: "success", title: "File uploaded", description: json.path });
+    } catch {
+      toast({ type: "error", title: "Upload failed", description: "Please try again." });
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  const activeOverrides = overrideMode === "light" ? data.themeOverridesLight : data.themeOverridesDark;
+
+  function setOverrideVar(varName: string, value: string) {
+    const field = overrideMode === "light" ? "themeOverridesLight" : "themeOverridesDark";
+    const current = { ...(overrideMode === "light" ? data.themeOverridesLight : data.themeOverridesDark) };
+    if (value) {
+      current[varName] = value;
+    } else {
+      delete current[varName];
+    }
+    update(field, current);
+  }
+
+  function resetOverrideVar(varName: string) {
+    const field = overrideMode === "light" ? "themeOverridesLight" : "themeOverridesDark";
+    const current = { ...(overrideMode === "light" ? data.themeOverridesLight : data.themeOverridesDark) };
+    delete current[varName];
+    update(field, current);
+  }
+
+  function resetAllOverrides() {
+    const field = overrideMode === "light" ? "themeOverridesLight" : "themeOverridesDark";
+    update(field, {});
   }
 
   return (
@@ -835,8 +904,9 @@ function AppearanceSection({
               type="button"
               onClick={() => {
                 update("themePreset", preset.id);
-                update("themeOverrides", {});
-                setTimeout(applyAppearance, 0);
+                update("themeOverridesLight", {});
+                update("themeOverridesDark", {});
+                applyAppearance(preset.id, {}, {});
               }}
               className={`rounded-lg border p-3 text-left transition-all ${
                 data.themePreset === preset.id
@@ -864,31 +934,77 @@ function AppearanceSection({
         </div>
       </FormField>
 
-      <FormField label="Branding" description="Customize your logo and favicon. Leave empty to use the default Owly branding.">
+      <FormField label="Branding" description="Upload your logo and favicon, or enter a URL. Uploaded files are stored at /uploads/.">
         <div className="space-y-3 mt-2">
           <div>
-            <label className="block text-xs font-medium text-owly-text-light mb-1">Logo URL (light mode)</label>
-            <TextInput
-              value={data.themeLogoUrl}
-              onChange={(v) => update("themeLogoUrl", v)}
-              placeholder="/owly.png or https://example.com/logo.png"
-            />
+            <label className="block text-xs font-medium text-owly-text-light mb-1">Logo (light mode)</label>
+            <div className="flex gap-2">
+              <TextInput
+                value={data.themeLogoUrl}
+                onChange={(v) => update("themeLogoUrl", v)}
+                placeholder="/uploads/logo.png or https://example.com/logo.png"
+              />
+              <label className="flex items-center px-3 py-2 text-xs font-medium rounded-lg border border-owly-border cursor-pointer hover:bg-owly-surface whitespace-nowrap">
+                {uploading === "themeLogoUrl" ? "Uploading..." : "Upload"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/x-icon"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUpload(f, "themeLogoUrl");
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-owly-text-light mb-1">Logo URL (dark mode, optional)</label>
-            <TextInput
-              value={data.themeLogoDarkUrl}
-              onChange={(v) => update("themeLogoDarkUrl", v)}
-              placeholder="Leave empty to use same logo"
-            />
+            <label className="block text-xs font-medium text-owly-text-light mb-1">Logo (dark mode, optional)</label>
+            <p className="text-xs text-owly-text-light mb-1">If empty, the light mode logo is used in dark mode as well.</p>
+            <div className="flex gap-2">
+              <TextInput
+                value={data.themeLogoDarkUrl}
+                onChange={(v) => update("themeLogoDarkUrl", v)}
+                placeholder="Leave empty to use light mode logo"
+              />
+              <label className="flex items-center px-3 py-2 text-xs font-medium rounded-lg border border-owly-border cursor-pointer hover:bg-owly-surface whitespace-nowrap">
+                {uploading === "themeLogoDarkUrl" ? "Uploading..." : "Upload"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/x-icon"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUpload(f, "themeLogoDarkUrl");
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-owly-text-light mb-1">Favicon URL</label>
-            <TextInput
-              value={data.themeFaviconUrl}
-              onChange={(v) => update("themeFaviconUrl", v)}
-              placeholder="/owly.png or https://example.com/favicon.ico"
-            />
+            <label className="block text-xs font-medium text-owly-text-light mb-1">Favicon</label>
+            <div className="flex gap-2">
+              <TextInput
+                value={data.themeFaviconUrl}
+                onChange={(v) => update("themeFaviconUrl", v)}
+                placeholder="/uploads/favicon.ico or https://example.com/favicon.ico"
+              />
+              <label className="flex items-center px-3 py-2 text-xs font-medium rounded-lg border border-owly-border cursor-pointer hover:bg-owly-surface whitespace-nowrap">
+                {uploading === "themeFaviconUrl" ? "Uploading..." : "Upload"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/x-icon"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUpload(f, "themeFaviconUrl");
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
           </div>
         </div>
       </FormField>
@@ -905,37 +1021,47 @@ function AppearanceSection({
 
       {showAdvanced && (
         <div className="space-y-3 rounded-lg border border-owly-border p-4 bg-owly-bg">
-          <p className="text-xs text-owly-text-light">
-            Override individual colors on top of the selected preset. Changes apply on save.
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-owly-text-light">
+              Override individual colors on top of the selected preset. Changes apply on save.
+            </p>
+            <div className="flex items-center gap-1 rounded-lg border border-owly-border p-0.5">
+              <button
+                type="button"
+                onClick={() => setOverrideMode("light")}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  overrideMode === "light" ? "bg-owly-primary text-white" : "text-owly-text-light hover:text-owly-text"
+                }`}
+              >
+                Light
+              </button>
+              <button
+                type="button"
+                onClick={() => setOverrideMode("dark")}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  overrideMode === "dark" ? "bg-owly-primary text-white" : "text-owly-text-light hover:text-owly-text"
+                }`}
+              >
+                Dark
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {colorVarNames.map((varName) => {
-              const currentOverride = (data.themeOverrides as Record<string, string>)[varName] || "";
+              const currentOverride = (activeOverrides as Record<string, string>)[varName] || "";
               return (
                 <div key={varName} className="flex items-center gap-2">
                   <input
                     type="color"
-                    value={currentOverride || ""}
-                    onChange={(e) => {
-                      const newOverrides = { ...data.themeOverrides };
-                      if (e.target.value) {
-                        newOverrides[varName] = e.target.value;
-                      } else {
-                        delete newOverrides[varName];
-                      }
-                      update("themeOverrides", newOverrides);
-                    }}
+                    value={currentOverride || (presetColors as Record<string, string>)[varName] || "#000000"}
+                    onChange={(e) => setOverrideVar(varName, e.target.value)}
                     className="h-8 w-12 rounded border border-owly-border cursor-pointer"
                   />
                   <span className="text-xs font-mono text-owly-text-light flex-1">{varName}</span>
                   {currentOverride && (
                     <button
                       type="button"
-                      onClick={() => {
-                        const newOverrides = { ...data.themeOverrides };
-                        delete newOverrides[varName];
-                        update("themeOverrides", newOverrides);
-                      }}
+                      onClick={() => resetOverrideVar(varName)}
                       className="text-xs text-owly-danger hover:text-red-700"
                     >
                       Reset
@@ -947,10 +1073,10 @@ function AppearanceSection({
           </div>
           <button
             type="button"
-            onClick={() => update("themeOverrides", {})}
+            onClick={resetAllOverrides}
             className="text-xs text-owly-text-light hover:text-owly-text"
           >
-            Reset all overrides to preset defaults
+            Reset all {overrideMode} overrides to preset defaults
           </button>
         </div>
       )}
@@ -992,10 +1118,13 @@ const defaultSettings: SettingsData = {
   whatsappApiKey: "",
   whatsappPhone: "",
   themePreset: "owly-default",
-  themeOverrides: {},
+  themeOverridesLight: {},
+  themeOverridesDark: {},
   themeLogoUrl: "",
   themeLogoDarkUrl: "",
   themeFaviconUrl: "",
+  appName: "Owly",
+  appNameShort: "Owly",
 };
 
 export default function SettingsPage() {
@@ -1027,12 +1156,23 @@ export default function SettingsPage() {
 
         if (settings.themePreset) {
           const { setAppearance } = useThemeAppearance.getState();
+          const rawLight = settings.themeOverridesLight;
+          const rawDark = settings.themeOverridesDark;
+          const safeLight = (typeof rawLight === "object" && rawLight !== null && !Array.isArray(rawLight))
+            ? rawLight as Record<string, string>
+            : {};
+          const safeDark = (typeof rawDark === "object" && rawDark !== null && !Array.isArray(rawDark))
+            ? rawDark as Record<string, string>
+            : {};
           setAppearance({
             themePreset: settings.themePreset,
-            themeOverrides: settings.themeOverrides || {},
+            themeOverridesLight: safeLight,
+            themeOverridesDark: safeDark,
             themeLogoUrl: settings.themeLogoUrl || "",
             themeLogoDarkUrl: settings.themeLogoDarkUrl || "",
             themeFaviconUrl: settings.themeFaviconUrl || "",
+            appName: settings.appName || "Owly",
+            appNameShort: settings.appNameShort || "Owly",
           });
         }
       })
@@ -1040,7 +1180,7 @@ export default function SettingsPage() {
       .finally(() => setLoading(false));
   }, [addToast]);
 
-  const update = (field: keyof SettingsData, value: string | number) => {
+  const update = (field: keyof SettingsData, value: string | number | Record<string, string>) => {
     setData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -1066,10 +1206,13 @@ export default function SettingsPage() {
         const { setAppearance } = useThemeAppearance.getState();
         setAppearance({
           themePreset: data.themePreset,
-          themeOverrides: data.themeOverrides,
+          themeOverridesLight: data.themeOverridesLight,
+          themeOverridesDark: data.themeOverridesDark,
           themeLogoUrl: data.themeLogoUrl,
           themeLogoDarkUrl: data.themeLogoDarkUrl,
           themeFaviconUrl: data.themeFaviconUrl,
+          appName: data.appName,
+          appNameShort: data.appNameShort,
         });
       }
     } catch {

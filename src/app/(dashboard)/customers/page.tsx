@@ -165,7 +165,7 @@ export default function CustomersPage() {
         if (res.ok) {
           const data = await res.json();
           setCustomers(data.data ?? data.customers ?? []);
-          setPagination(data.pagination);
+          setPagination(data.data?.pagination ?? data.pagination);
         }
       } catch (error) {
         console.error("Failed to fetch customers:", error);

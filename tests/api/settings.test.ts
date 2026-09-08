@@ -131,4 +131,57 @@ describe("PUT /api/settings", () => {
       expect(data[field]).toBe("***");
     }
   });
+
+  it("should accept themeOverridesLight and themeOverridesDark", async () => {
+    mockPrisma.settings.upsert.mockResolvedValue({
+      ...fixtures.settings,
+      themeOverridesLight: { "--owly-primary": "#FF6B00" },
+      themeOverridesDark: { "--owly-primary": "#FF6B00", "--owly-bg": "#0f1117" },
+    });
+
+    const { PUT } = await import("@/app/api/settings/route");
+    const request = createRequest("/api/settings", {
+      method: "PUT",
+      body: {
+        themePreset: "mono",
+        themeOverridesLight: { "--owly-primary": "#FF6B00" },
+        themeOverridesDark: { "--owly-primary": "#FF6B00", "--owly-bg": "#0f1117" },
+      },
+    });
+
+    const response = await PUT(request);
+    expect(response.status).toBe(200);
+  });
+
+  it("should reject old themeOverrides field", async () => {
+    const { PUT } = await import("@/app/api/settings/route");
+    const request = createRequest("/api/settings", {
+      method: "PUT",
+      body: { themeOverrides: { "--owly-primary": "#FF6B00" } },
+    });
+
+    const response = await PUT(request);
+    expect(response.status).toBe(400);
+  });
+
+  it("should accept theme logo and favicon URLs", async () => {
+    mockPrisma.settings.upsert.mockResolvedValue({
+      ...fixtures.settings,
+      themeLogoUrl: "/uploads/logo.png",
+      themeFaviconUrl: "/uploads/favicon.ico",
+    });
+
+    const { PUT } = await import("@/app/api/settings/route");
+    const request = createRequest("/api/settings", {
+      method: "PUT",
+      body: {
+        themeLogoUrl: "/uploads/logo.png",
+        themeLogoDarkUrl: "/uploads/logo-dark.png",
+        themeFaviconUrl: "/uploads/favicon.ico",
+      },
+    });
+
+    const response = await PUT(request);
+    expect(response.status).toBe(200);
+  });
 });

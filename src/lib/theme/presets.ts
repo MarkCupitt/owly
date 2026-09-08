@@ -291,18 +291,15 @@ export function formatCssVars(colors: ThemeColors): string {
 
 export function buildThemeStyleTag(
   presetId: string,
-  overrides: Record<string, string> = {},
-  assets: ThemeAssets = {}
+  overridesLight: Record<string, string> = {},
+  overridesDark: Record<string, string> = {},
+  _assets: ThemeAssets = {}
 ): string {
-  const lightColors = resolveThemeColors(presetId, overrides, "light");
-  const darkColors = resolveThemeColors(presetId, overrides, "dark");
+  const lightColors = resolveThemeColors(presetId, overridesLight, "light");
+  const darkColors = resolveThemeColors(presetId, overridesDark, "dark");
 
   let css = `:root {\n  ${formatCssVars(lightColors)}\n}`;
   css += `\n.dark {\n  ${formatCssVars(darkColors)}\n}`;
-
-  if (assets.faviconUrl) {
-    css += `\nlink[rel="icon"] { content: "${assets.faviconUrl}"; }`;
-  }
 
   return css;
 }

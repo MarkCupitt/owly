@@ -7,7 +7,7 @@ import { buildThemeStyleTag } from "@/lib/theme/presets";
 
 export function ThemeInit() {
   const { theme } = useTheme();
-  const { themePreset, themeOverrides, themeLogoUrl, themeLogoDarkUrl, themeFaviconUrl, hydrated } = useThemeAppearance();
+  const { themePreset, themeOverridesLight, themeOverridesDark, themeLogoUrl, themeLogoDarkUrl, themeFaviconUrl, hydrated } = useThemeAppearance();
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -27,7 +27,8 @@ export function ThemeInit() {
 
     const css = buildThemeStyleTag(
       themePreset,
-      themeOverrides,
+      themeOverridesLight,
+      themeOverridesDark,
       { logoUrl: themeLogoUrl, logoDarkUrl: themeLogoDarkUrl, faviconUrl: themeFaviconUrl }
     );
     styleEl.textContent = css;
@@ -41,7 +42,7 @@ export function ThemeInit() {
       }
       faviconLink.href = themeFaviconUrl;
     }
-  }, [themePreset, themeOverrides, themeLogoUrl, themeLogoDarkUrl, themeFaviconUrl, hydrated]);
+  }, [themePreset, themeOverridesLight, themeOverridesDark, themeLogoUrl, themeLogoDarkUrl, themeFaviconUrl, hydrated]);
 
   return null;
 }

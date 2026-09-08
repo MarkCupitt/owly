@@ -86,7 +86,7 @@ const sections: NavSection[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const { themeLogoUrl, themeLogoDarkUrl } = useThemeAppearance();
+  const { themeLogoUrl, themeLogoDarkUrl, appNameShort } = useThemeAppearance();
   const { theme } = useTheme();
   const logoSrc = (theme === "dark" && themeLogoDarkUrl) || themeLogoUrl || "/owly.png";
 
@@ -108,7 +108,7 @@ export function Sidebar() {
         />
         {!collapsed && (
           <div className="overflow-hidden">
-            <h1 className="text-base font-bold tracking-tight">Owly</h1>
+            <h1 className="text-base font-bold tracking-tight">{appNameShort || "Owly"}</h1>
             <p className="text-[10px] text-white/50">AI Customer Support</p>
           </div>
         )}
@@ -154,6 +154,19 @@ export function Sidebar() {
       </nav>
 
       <div className="px-2 py-2 border-t border-white/10">
+        {!collapsed && (
+          <p className="text-center text-[10px] text-white/30 mb-1">
+            Powered by{" "}
+            <a
+              href="https://github.com/Hesper-Labs/owly"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/50 hover:text-white/70 underline"
+            >
+              Owly
+            </a>
+          </p>
+        )}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="flex items-center justify-center w-full py-1.5 rounded-md text-white/40 hover:text-white hover:bg-owly-sidebar-hover transition-colors"
