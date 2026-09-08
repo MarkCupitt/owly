@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useThemeAppearance } from "@/lib/hooks/use-theme-appearance";
 
 const STEPS = [
   "Create Admin Account",
@@ -30,6 +31,7 @@ export default function SetupPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
+  const { themeLogoUrl } = useThemeAppearance();
 
   // Step 1 - Admin Account
   const [name, setName] = useState("");
@@ -175,7 +177,7 @@ export default function SetupPage() {
       {/* Header */}
       <div className="bg-owly-primary-50 border-b border-owly-border px-8 pt-6 pb-4">
         <div className="flex items-center gap-3 mb-5">
-          <Image src="/owly.png" alt="Owly" width={40} height={40} />
+          <Image src={themeLogoUrl || "/owly.png"} alt="Owly" width={40} height={40} unoptimized />
           <div>
             <h1 className="text-lg font-bold text-owly-text">Set Up Owly</h1>
             <p className="text-xs text-owly-text-light">

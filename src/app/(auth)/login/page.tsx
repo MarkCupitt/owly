@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useThemeAppearance } from "@/lib/hooks/use-theme-appearance";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const { themeLogoUrl } = useThemeAppearance();
 
   useEffect(() => {
     async function checkAuth() {
@@ -72,11 +74,12 @@ export default function LoginPage() {
     <div className="bg-owly-surface rounded-2xl shadow-lg border border-owly-border p-8">
       <div className="flex flex-col items-center mb-8">
         <Image
-          src="/owly.png"
+          src={themeLogoUrl || "/owly.png"}
           alt="Owly"
           width={56}
           height={56}
           className="mb-4"
+          unoptimized
         />
         <h1 className="text-2xl font-bold text-owly-text">
           Welcome to Owly

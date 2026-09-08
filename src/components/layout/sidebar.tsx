@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useThemeAppearance } from "@/lib/hooks/use-theme-appearance";
+import { useTheme } from "@/lib/hooks/use-theme";
 import {
   LayoutDashboard,
   BookOpen,
@@ -84,6 +86,9 @@ const sections: NavSection[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { themeLogoUrl, themeLogoDarkUrl } = useThemeAppearance();
+  const { theme } = useTheme();
+  const logoSrc = (theme === "dark" && themeLogoDarkUrl) || themeLogoUrl || "/owly.png";
 
   return (
     <aside
@@ -94,11 +99,12 @@ export function Sidebar() {
     >
       <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
         <Image
-          src="/owly.png"
+          src={logoSrc}
           alt="Owly"
           width={32}
           height={32}
           className="rounded-lg flex-shrink-0"
+          unoptimized
         />
         {!collapsed && (
           <div className="overflow-hidden">
