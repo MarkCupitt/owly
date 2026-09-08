@@ -19,7 +19,7 @@ services:
           memory: 512M
 
   app:
-    image: 192.168.2.15:5000/owly-app:latest
+    build: .
     restart: unless-stopped
     ports:
       - "3000:3000"
