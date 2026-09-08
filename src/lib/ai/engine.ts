@@ -1,8 +1,8 @@
-import OpenAI from "openai";
 import { prisma } from "@/lib/prisma";
 import { owlyTools, executeToolCall } from "./tools";
 import { emitNewMessage } from "@/lib/realtime";
 import { analyzeSentiment, detectIntent, estimateConfidence, requiresHumanApproval } from "./guardrails";
+import { createProvider } from "./providers";
 import type {
   AIMessage,
   AIConfig,
@@ -88,6 +88,7 @@ async function getAIConfig(): Promise<AIConfig & ConversationContext> {
     apiKey: settings.aiApiKey,
     maxTokens: settings.maxTokens,
     temperature: settings.temperature,
+    aiBaseUrl: settings.aiBaseUrl || undefined,
     businessName: settings.businessName,
     businessDesc: settings.businessDesc,
     welcomeMessage: settings.welcomeMessage,
@@ -216,50 +217,36 @@ async function callAI(
     return "I apologize, but I'm having trouble processing your request. Let me connect you with a team member.";
   }
 
-  const openai = new OpenAI({ apiKey: config.apiKey });
+  const provider = createProvider(config);
 
-  let response;
+  let result;
   try {
-    response = await openai.chat.completions.create({
+    result = await provider.chat({
       model: config.model,
-      messages: messages as OpenAI.ChatCompletionMessageParam[],
-      tools: owlyTools as OpenAI.ChatCompletionTool[],
-      max_tokens: config.maxTokens,
+      messages,
+      tools: owlyTools,
+      maxTokens: config.maxTokens,
       temperature: config.temperature,
     });
   } catch {
     return "I'm temporarily unable to process your request. Please try again in a moment, or I can connect you with a team member.";
   }
 
-  const choice = response.choices[0];
-
   if (
-    choice.finish_reason === "tool_calls" &&
-    choice.message.tool_calls?.length
+    result.finishReason === "tool_calls" &&
+    result.toolCalls?.length
   ) {
-    // Process tool calls
-    const toolCalls = choice.message.tool_calls as Array<{
-      id: string;
-      type: string;
-      function: { name: string; arguments: string };
-    }>;
+    const toolCalls = result.toolCalls;
 
     messages.push({
       role: "assistant",
-      content: choice.message.content || "",
-      tool_calls: toolCalls.map((tc) => ({
-        id: tc.id,
-        type: "function" as const,
-        function: {
-          name: tc.function.name,
-          arguments: tc.function.arguments,
-        },
-      })),
+      content: result.content,
+      tool_calls: toolCalls,
     });
 
     for (const toolCall of toolCalls) {
       const args = JSON.parse(toolCall.function.arguments);
-      const result = await executeToolCall(
+      const toolResult = await executeToolCall(
         toolCall.function.name,
         args,
         conversationId
@@ -267,16 +254,15 @@ async function callAI(
 
       messages.push({
         role: "tool",
-        content: result,
+        content: toolResult,
         tool_call_id: toolCall.id,
       });
     }
 
-    // Continue the conversation with tool results
     return callAI(config, messages, conversationId, depth + 1);
   }
 
-  return choice.message.content || "I apologize, I could not generate a response.";
+  return result.content || "I apologize, I could not generate a response.";
 }
 
 export async function createNewConversation(

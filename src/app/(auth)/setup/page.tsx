@@ -20,6 +20,8 @@ const TONE_OPTIONS = [
 
 const PROVIDER_OPTIONS = [
   { value: "openai", label: "OpenAI", models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"] },
+  { value: "nvidia", label: "NVIDIA NIM", models: ["nvidia/llama-3.3-nemotron-super-49b-v1", "meta/llama-3.1-405b-instruct", "meta/llama-3.1-70b-instruct"] },
+  { value: "gemini", label: "Google Gemini", models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"] },
   { value: "claude", label: "Claude (Anthropic)", models: ["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"] },
   { value: "ollama", label: "Ollama (Local)", models: ["llama3", "mistral", "codellama", "phi3"] },
 ];

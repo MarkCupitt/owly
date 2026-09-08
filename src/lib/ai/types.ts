@@ -1,6 +1,18 @@
+export interface TextPart {
+  type: "text";
+  text: string;
+}
+
+export interface ImagePart {
+  type: "image_url";
+  image_url: { url: string };
+}
+
+export type ContentPart = TextPart | ImagePart;
+
 export interface AIMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string;
+  content: string | ContentPart[];
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string;
@@ -35,6 +47,30 @@ export interface AIConfig {
   apiKey: string;
   maxTokens: number;
   temperature: number;
+  aiBaseUrl?: string;
+}
+
+export interface AIProvider {
+  chat(params: {
+    model: string;
+    messages: AIMessage[];
+    tools?: ToolDefinition[];
+    maxTokens: number;
+    temperature: number;
+  }): Promise<{
+    content: string;
+    toolCalls?: ToolCall[];
+    finishReason: string;
+  }>;
+}
+
+export interface ProviderConfig {
+  baseURL: string;
+  models: { value: string; label: string; vision?: boolean }[];
+  supportsVision: boolean;
+  fetchModelsDynamically: boolean;
+  apiKeyLabel?: string;
+  apiKeyRequired: boolean;
 }
 
 export interface ConversationContext {
