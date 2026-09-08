@@ -91,7 +91,7 @@ export default function ActivityPage() {
       const res = await fetch(`/api/activity?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
-        setData(json);
+        setData(json.data ?? json);
       }
     } catch (error) {
       console.error("Failed to fetch activities:", error);
