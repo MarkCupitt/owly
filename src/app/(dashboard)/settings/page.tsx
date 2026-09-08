@@ -1214,6 +1214,12 @@ export default function SettingsPage() {
           appName: data.appName,
           appNameShort: data.appNameShort,
         });
+      } else if (activeTab === "general") {
+        const { setAppearance } = useThemeAppearance.getState();
+        setAppearance({
+          appName: data.appName,
+          appNameShort: data.appNameShort,
+        });
       }
     } catch {
       addToast("error", "Failed to save settings. Please try again.");
