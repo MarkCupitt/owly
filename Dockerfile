@@ -9,6 +9,7 @@ RUN npm ci
 COPY . .
 
 RUN npx prisma generate
+ARG JWT_SECRET=build-placeholder
 RUN npm run build
 
 # ---- Runner stage ----
@@ -57,6 +58,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src/generated ./src/generated
 COPY --from=builder /app/next.config.ts ./
+COPY --from=builder /app/prisma.config.ts ./
 
 RUN chown -R nextjs:nodejs /app
 
