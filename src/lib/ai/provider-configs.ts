@@ -38,6 +38,8 @@ export const PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
   gemini: {
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
     models: [
+      { value: "gemini-flash-latest", label: "Gemini Flash (Latest)", vision: true },
+      { value: "gemini-pro-latest", label: "Gemini Pro (Latest)", vision: true },
       { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", vision: true },
       { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", vision: true },
       { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash", vision: true },

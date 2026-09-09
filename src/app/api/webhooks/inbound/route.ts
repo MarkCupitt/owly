@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { resolveCustomer } from "@/lib/customer-resolver";
 import { chat, createNewConversation } from "@/lib/ai/engine";
 import { emitNewMessage } from "@/lib/realtime";
+import { fireOutboundWebhook } from "@/lib/channels/outbound-webhook";
 
 interface InboundPayload {
   channel: string;
@@ -30,16 +31,26 @@ async function findOrCreateChannel(channelType: string, displayName?: string) {
   });
 
   if (!channel) {
-    logger.info(`[Inbound] Auto-creating channel: ${channelType}`);
-    channel = await prisma.channel.create({
-      data: {
-        type: channelType,
-        displayName: displayName || channelType,
-        isCustom: true,
-        isActive: true,
-        status: "connected",
-      },
-    });
+    try {
+      logger.info(`[Inbound] Auto-creating channel: ${channelType}`);
+      channel = await prisma.channel.create({
+        data: {
+          type: channelType,
+          displayName: displayName || channelType,
+          isCustom: true,
+          isActive: true,
+          status: "connected",
+        },
+      });
+    } catch (e: any) {
+      if (e.code === "P2002") {
+        channel = await prisma.channel.findUnique({
+          where: { type: channelType },
+        });
+      } else {
+        throw e;
+      }
+    }
   }
 
   return channel;
@@ -90,6 +101,14 @@ export async function POST(request: NextRequest) {
 
     // ─── Find or auto-create channel ───────────────────────
     const channel = await findOrCreateChannel(body.channel, body.channelDisplayName);
+
+    if (!channel) {
+      logger.error(`[Inbound] Failed to find or create channel: ${body.channel}`);
+      return NextResponse.json(
+        { error: "Failed to find or create channel" },
+        { status: 500 }
+      );
+    }
 
     if (!channel.isActive) {
       logger.info(`[Inbound] Channel '${body.channel}' is disabled`);
@@ -186,6 +205,13 @@ export async function POST(request: NextRequest) {
 
         // chat() already stores the assistant message and emits it
         autoReplied = true;
+
+        // Fire outbound webhook so the AI reply gets delivered back to the channel
+        if (reply) {
+          fireOutboundWebhook(conversation.id, reply).catch((err) =>
+            logger.error("[Inbound] Outbound webhook for AI reply failed:", err)
+          );
+        }
       } catch (error) {
         logger.error(`[Inbound] AI auto-reply failed for channel ${body.channel}:`, error);
       }
