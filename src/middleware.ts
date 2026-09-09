@@ -86,7 +86,8 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api/channels/phone/") ||
     pathname.startsWith("/api/channels/sms") ||
-    pathname.startsWith("/api/channels/telegram")
+    pathname.startsWith("/api/channels/telegram") ||
+    pathname.startsWith("/api/webhooks/inbound")
   ) {
     return addHeaders(NextResponse.next(), requestId);
   }
