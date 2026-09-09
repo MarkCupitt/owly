@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - Fork Local Patches
+
+### Added
+
+- Cross-channel customer matching: 5-step resolver (channel ID → email → phone → cross-field → auto-create)
+- `facebookId` and `instagramId` fields on Customer model with indexes (migration `20260909200000`)
+- `sender_email` and `sender_phone` fields on inbound webhook payload
+- `customer_email`, `customer_phone`, and `metadata` on outbound webhook payload
+- `channel_display_name` on outbound webhook payload
+- 16 unit tests for customer resolver (normalizePhone, all 5 match steps, backfill, empty contact)
+
+### Changed
+
+- `customer-resolver.ts` rewritten with `CustomerMatchContext` interface for multi-channel matching
+- Inbound webhook route passes `senderEmail`, `senderPhone`, and `metadata` to resolver
+- Outbound webhook fetches customer record to enrich payload with email/phone
+- `backfill-customer-ids.ts` updated to match on `facebookId` and `instagramId`
+
 ## [0.2.2] - 2026-04-08
 
 ### Added

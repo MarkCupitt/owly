@@ -3,16 +3,20 @@ import { logger } from "@/lib/logger";
 
 interface OutboundPayload {
   channel: string;
+  channel_display_name: string;
   conversation_id: string;
   recipient_id: string;
   recipient_name: string;
   message_text: string;
   thread_id?: string;
   timestamp: string;
+  customer_email?: string;
+  customer_phone?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /**
- * Fire outbound webhook to n8n (or any external system) when staff reply
+ * Fire outbound webhook to an external system when staff reply
  * on a custom channel conversation.
  *
  * This is called after a staff member sends a reply (or a canned response)
@@ -56,14 +60,32 @@ export async function fireOutboundWebhook(
     const metadata = (conversation.metadata as Record<string, unknown>) || {};
     const threadId = (metadata.threadId as string) || undefined;
 
+    // Fetch customer for email/phone enrichment
+    let customerEmail: string | undefined;
+    let customerPhone: string | undefined;
+    if (conversation.customerId) {
+      const customer = await prisma.customer.findUnique({
+        where: { id: conversation.customerId },
+        select: { email: true, phone: true },
+      });
+      if (customer) {
+        customerEmail = customer.email || undefined;
+        customerPhone = customer.phone || undefined;
+      }
+    }
+
     const payload: OutboundPayload = {
       channel: channel.type,
+      channel_display_name: channel.displayName || channel.type,
       conversation_id: conversationId,
       recipient_id: conversation.customerContact,
       recipient_name: conversation.customerName,
       message_text: messageContent,
       thread_id: threadId,
       timestamp: new Date().toISOString(),
+      customer_email: customerEmail,
+      customer_phone: customerPhone,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     };
 
     // Build headers from channel config + default content-type

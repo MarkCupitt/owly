@@ -349,6 +349,8 @@ model Customer {
   email         String         @default("")
   phone         String         @default("")
   whatsapp      String         @default("")
+  facebookId    String         @default("")
+  instagramId   String         @default("")
   tags          String         @default("") // comma-separated
   isBlocked     Boolean        @default(false)
   notes         CustomerNote[]
@@ -362,6 +364,8 @@ model Customer {
   @@index([email])
   @@index([phone])
   @@index([whatsapp])
+  @@index([facebookId])
+  @@index([instagramId])
   @@index([lastContact])
 }
 

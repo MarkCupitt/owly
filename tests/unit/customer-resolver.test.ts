@@ -1,129 +1,307 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { resolveCustomer, normalizePhone } from "@/lib/customer-resolver";
 
-const mockPrisma = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>;
+describe("normalizePhone", () => {
+  it("strips WhatsApp suffixes", () => {
+    expect(normalizePhone("639765247811@c.us")).toBe("639765247811");
+    expect(normalizePhone("639765247811@s.whatsapp.net")).toBe("639765247811");
+  });
 
-describe("Customer Resolver", () => {
+  it("strips non-digit chars except leading +", () => {
+    expect(normalizePhone("+63 976 524 7811")).toBe("+639765247811");
+    expect(normalizePhone("(63) 976-524-7811")).toBe("639765247811");
+  });
+
+  it("removes + from non-leading positions", () => {
+    expect(normalizePhone("63+976+524+7811")).toBe("639765247811");
+  });
+});
+
+describe("resolveCustomer — cross-channel matching", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    mockPrisma.customer.findFirst.mockResolvedValue(null);
-    mockPrisma.customer.findUnique.mockResolvedValue(null);
-    mockPrisma.customer.create.mockResolvedValue({ id: "new-cust-1" });
-    mockPrisma.customer.update.mockResolvedValue({});
+
+    (prisma.customer.findFirst as ReturnType<typeof vi.fn>).mockReset();
+    (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockReset();
+    (prisma.customer.create as ReturnType<typeof vi.fn>).mockReset();
+    (prisma.customer.update as ReturnType<typeof vi.fn>).mockReset();
   });
 
-  describe("normalizePhone", () => {
-    it("should strip @c.us suffix", () => {
-      expect(normalizePhone("5551234567@c.us")).toBe("5551234567");
+  describe("Step 1: Channel-specific ID match", () => {
+    it("matches messenger customer by facebookId", async () => {
+      const existing = {
+        id: "cust-fb-1", name: "Jane Doe", email: "", phone: "", whatsapp: "",
+        facebookId: "fb_123", instagramId: "",
+      };
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+      (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+
+      const result = await resolveCustomer("messenger", "fb_123", "Jane Doe");
+
+      expect(result).toBe("cust-fb-1");
+      expect(prisma.customer.findFirst).toHaveBeenCalledWith({
+        where: { facebookId: "fb_123" },
+      });
     });
 
-    it("should strip @s.whatsapp.net suffix", () => {
-      expect(normalizePhone("5551234567@s.whatsapp.net")).toBe("5551234567");
+    it("matches instagram customer by instagramId", async () => {
+      const existing = {
+        id: "cust-ig-1", name: "John Smith", email: "", phone: "", whatsapp: "",
+        facebookId: "", instagramId: "ig_456",
+      };
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+      (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+
+      const result = await resolveCustomer("instagram", "ig_456", "John Smith");
+
+      expect(result).toBe("cust-ig-1");
+      expect(prisma.customer.findFirst).toHaveBeenCalledWith({
+        where: { instagramId: "ig_456" },
+      });
     });
 
-    it("should keep leading + and strip other non-digits", () => {
-      expect(normalizePhone("+1 (555) 123-4567")).toBe("+15551234567");
-    });
+    it("matches email customer by email (case-insensitive)", async () => {
+      const existing = {
+        id: "cust-email-1", name: "Mark", email: "mark@example.com", phone: "", whatsapp: "",
+        facebookId: "", instagramId: "",
+      };
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+      (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
 
-    it("should handle already clean numbers", () => {
-      expect(normalizePhone("+15551234567")).toBe("+15551234567");
+      const result = await resolveCustomer("email", "Mark@Example.COM", "Mark");
+
+      expect(result).toBe("cust-email-1");
     });
   });
 
-  describe("resolveCustomer", () => {
-    it("should find customer by email (direct match)", async () => {
-      mockPrisma.customer.findFirst.mockResolvedValueOnce({
-        id: "cust-1",
-        name: "John",
-        email: "john@test.com",
-        phone: "",
-        whatsapp: "",
-      });
-      mockPrisma.customer.findUnique.mockResolvedValue({
-        name: "John",
-        email: "john@test.com",
-        phone: "",
-        whatsapp: "",
-      });
+  describe("Step 2: Email match (cross-channel)", () => {
+    it("matches existing email customer when messenger message includes sender_email", async () => {
+      const existing = {
+        id: "cust-email-1", name: "Mark Cupitt", email: "mark@example.com", phone: "", whatsapp: "",
+        facebookId: "", instagramId: "",
+      };
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existing);
 
-      const result = await resolveCustomer("email", "john@test.com", "John");
-      expect(result).toBe("cust-1");
-    });
+      (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
 
-    it("should find customer by whatsapp number", async () => {
-      mockPrisma.customer.findFirst.mockResolvedValueOnce({
-        id: "cust-2",
-        name: "Jane",
-        whatsapp: "5551234567@c.us",
-      });
-      mockPrisma.customer.findUnique.mockResolvedValue({
-        name: "Jane",
-        email: "",
-        phone: "",
-        whatsapp: "5551234567@c.us",
+      const result = await resolveCustomer("messenger", "fb_789", "Mark Cupitt", {
+        senderEmail: "mark@example.com",
       });
 
-      const result = await resolveCustomer("whatsapp", "5551234567@c.us", "Jane");
-      expect(result).toBe("cust-2");
-    });
-
-    it("should auto-create customer when not found", async () => {
-      // All findFirst calls return null
-      mockPrisma.customer.findFirst.mockResolvedValue(null);
-      mockPrisma.customer.create.mockResolvedValue({ id: "new-cust" });
-
-      const result = await resolveCustomer("email", "new@test.com", "New User");
-
-      expect(result).toBe("new-cust");
-      expect(mockPrisma.customer.create).toHaveBeenCalledWith({
+      expect(result).toBe("cust-email-1");
+      expect(prisma.customer.update).toHaveBeenCalledWith({
+        where: { id: "cust-email-1" },
         data: expect.objectContaining({
-          name: "New User",
-          email: "new@test.com",
-        }),
-      });
-    });
-
-    it("should create customer with phone field for phone channel", async () => {
-      mockPrisma.customer.findFirst.mockResolvedValue(null);
-      mockPrisma.customer.create.mockResolvedValue({ id: "phone-cust" });
-
-      await resolveCustomer("phone", "+15551234567", "Phone Caller");
-
-      expect(mockPrisma.customer.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          phone: "+15551234567",
-        }),
-      });
-    });
-
-    it("should update lastContact on existing customer", async () => {
-      mockPrisma.customer.findFirst.mockResolvedValueOnce({
-        id: "existing-1",
-        name: "Existing User",
-      });
-      mockPrisma.customer.findUnique.mockResolvedValue({
-        name: "Existing User",
-        email: "existing@test.com",
-        phone: "",
-        whatsapp: "",
-      });
-
-      await resolveCustomer("email", "existing@test.com", "Existing User");
-
-      expect(mockPrisma.customer.update).toHaveBeenCalledWith({
-        where: { id: "existing-1" },
-        data: expect.objectContaining({
+          facebookId: "fb_789",
           lastContact: expect.any(Date),
         }),
       });
     });
 
-    it("should handle empty customerContact", async () => {
-      mockPrisma.customer.create.mockResolvedValue({ id: "empty-contact" });
+    it("does not match when senderEmail is a Facebook proxy email that doesn't exist in DB", async () => {
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
 
-      const result = await resolveCustomer("api", "", "API User");
-      expect(result).toBe("empty-contact");
+      (prisma.customer.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: "cust-new-1",
+      });
+
+      const result = await resolveCustomer("messenger", "fb_999", "Unknown", {
+        senderEmail: "12345@facebook.com",
+      });
+
+      expect(result).toBe("cust-new-1");
+      expect(prisma.customer.create).toHaveBeenCalled();
+    });
+  });
+
+  describe("Step 3: Phone match (cross-channel)", () => {
+    it("matches existing phone customer when messenger message includes sender_phone", async () => {
+      const existing = {
+        id: "cust-phone-1", name: "Jane", email: "", phone: "+639765247811", whatsapp: "",
+        facebookId: "", instagramId: "",
+      };
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existing);
+
+      (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+
+      const result = await resolveCustomer("messenger", "fb_111", "Jane", {
+        senderPhone: "+63 976 524 7811",
+      });
+
+      expect(result).toBe("cust-phone-1");
+      expect(prisma.customer.update).toHaveBeenCalledWith({
+        where: { id: "cust-phone-1" },
+        data: expect.objectContaining({
+          facebookId: "fb_111",
+        }),
+      });
+    });
+  });
+
+  describe("Step 4: Cross-field fallback", () => {
+    it("matches when customerContact exists in any contact field", async () => {
+      const existing = {
+        id: "cust-x-1", name: "Existing", email: "", phone: "", whatsapp: "",
+        facebookId: "", instagramId: "",
+      };
+      // For a custom channel with no senderEmail/senderPhone:
+      // Step 1 (findByChannelField) → default case → null (no findFirst call)
+      // Step 2 (email) → skipped (no senderEmail)
+      // Step 3 (phone) → skipped (no senderPhone)
+      // Step 4 (cross-field) → findFirst with OR query
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+
+      (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+
+      const result = await resolveCustomer("custom_channel", "some_contact_id", "Existing");
+
+      expect(result).toBe("cust-x-1");
+    });
+  });
+
+  describe("Step 5: Auto-create new customer", () => {
+    it("creates customer with all available identifiers", async () => {
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+      (prisma.customer.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: "cust-new-1",
+      });
+
+      const result = await resolveCustomer("messenger", "fb_new", "New User", {
+        senderEmail: "new@example.com",
+        senderPhone: "+639765247811",
+      });
+
+      expect(result).toBe("cust-new-1");
+      expect(prisma.customer.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          name: "New User",
+          facebookId: "fb_new",
+          email: "new@example.com",
+          phone: "+639765247811",
+          firstContact: expect.any(Date),
+          lastContact: expect.any(Date),
+        }),
+      });
+    });
+
+    it("creates customer with instagramId for instagram channel", async () => {
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+      (prisma.customer.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: "cust-ig-new",
+      });
+
+      const result = await resolveCustomer("instagram", "ig_new", "IG User");
+
+      expect(result).toBe("cust-ig-new");
+      expect(prisma.customer.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          name: "IG User",
+          instagramId: "ig_new",
+        }),
+      });
+    });
+  });
+
+  describe("Backfill behavior", () => {
+    it("backfills email and facebookId when customer matched by phone", async () => {
+      const existing = {
+        id: "cust-1", name: "Jane", email: "", phone: "+639765247811", whatsapp: "",
+        facebookId: "", instagramId: "",
+      };
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existing);
+
+      (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+
+      await resolveCustomer("messenger", "fb_backfill", "Jane", {
+        senderEmail: "jane@example.com",
+        senderPhone: "+639765247811",
+      });
+
+      expect(prisma.customer.update).toHaveBeenCalledWith({
+        where: { id: "cust-1" },
+        data: expect.objectContaining({
+          facebookId: "fb_backfill",
+          email: "jane@example.com",
+        }),
+      });
+    });
+
+    it("does not overwrite existing email when backfilling", async () => {
+      const existing = {
+        id: "cust-1", name: "Jane", email: "jane@existing.com", phone: "", whatsapp: "",
+        facebookId: "", instagramId: "",
+      };
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existing);
+
+      (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+
+      await resolveCustomer("messenger", "fb_new", "Jane", {
+        senderEmail: "jane@different.com",
+      });
+
+      expect(prisma.customer.update).toHaveBeenCalledWith({
+        where: { id: "cust-1" },
+        data: expect.not.objectContaining({
+          email: "jane@different.com",
+        }),
+      });
+    });
+
+    it("updates name from Unknown to real name", async () => {
+      const existing = {
+        id: "cust-1", name: "Unknown", email: "mark@example.com", phone: "", whatsapp: "",
+        facebookId: "", instagramId: "",
+      };
+      (prisma.customer.findFirst as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existing);
+
+      (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existing);
+
+      await resolveCustomer("messenger", "fb_123", "Mark Cupitt", {
+        senderEmail: "mark@example.com",
+      });
+
+      expect(prisma.customer.update).toHaveBeenCalledWith({
+        where: { id: "cust-1" },
+        data: expect.objectContaining({
+          name: "Mark Cupitt",
+          facebookId: "fb_123",
+        }),
+      });
+    });
+  });
+
+  describe("Empty contact handling", () => {
+    it("creates customer with just name when no contact info", async () => {
+      (prisma.customer.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: "cust-anon",
+      });
+
+      const result = await resolveCustomer("messenger", "", "Anonymous User");
+
+      expect(result).toBe("cust-anon");
+      expect(prisma.customer.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          name: "Anonymous User",
+        }),
+      });
     });
   });
 });

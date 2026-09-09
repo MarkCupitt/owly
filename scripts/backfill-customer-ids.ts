@@ -40,6 +40,8 @@ async function backfill() {
           { email: { equals: contact, mode: "insensitive" } },
           { phone: contact },
           { whatsapp: contact },
+          { facebookId: contact },
+          { instagramId: contact },
         ],
       },
       select: { id: true, name: true },

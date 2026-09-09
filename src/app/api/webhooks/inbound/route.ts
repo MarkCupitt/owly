@@ -10,6 +10,8 @@ interface InboundPayload {
   channelDisplayName?: string;
   sender_name: string;
   sender_id: string;
+  sender_email?: string;
+  sender_phone?: string;
   message: string;
   thread_id?: string;
   timestamp?: string;
@@ -104,7 +106,12 @@ export async function POST(request: NextRequest) {
 
     // ─── Resolve customer ──────────────────────────────────
     const senderName = body.sender_name || "Unknown";
-    const customerId = await resolveCustomer(body.channel, body.sender_id, senderName);
+    const senderPhone = (body.metadata?.phone as string) || body.sender_phone;
+    const customerId = await resolveCustomer(body.channel, body.sender_id, senderName, {
+      senderEmail: body.sender_email,
+      senderPhone,
+      metadata: body.metadata,
+    });
 
     // ─── Find or create conversation ───────────────────────
     let conversation = await prisma.conversation.findFirst({
