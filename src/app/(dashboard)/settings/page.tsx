@@ -16,6 +16,8 @@ import {
   AlertCircle,
   Loader2,
   Palette,
+  Webhook,
+  Radio,
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/components/ui/toast";
@@ -64,6 +66,20 @@ interface SettingsData {
   themeFaviconUrl: string;
   appName: string;
   appNameShort: string;
+  autoReplyEnabled: boolean;
+}
+
+interface CustomChannel {
+  id: string | null;
+  type: string;
+  isActive: boolean;
+  isCustom: boolean;
+  displayName: string;
+  outboundWebhookUrl: string;
+  outboundWebhookHeaders: Record<string, string>;
+  autoReplyEnabled: boolean;
+  status: string;
+  disabledReason: string;
 }
 
 type SectionKey =
@@ -73,6 +89,7 @@ type SectionKey =
   | "phone"
   | "email"
   | "whatsapp"
+  | "channels"
   | "appearance";
 
 interface TabDef {
@@ -92,12 +109,13 @@ const tabs: TabDef[] = [
   { key: "phone", label: "Phone (Twilio)", icon: Phone },
   { key: "email", label: "Email (SMTP/IMAP)", icon: Mail },
   { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { key: "channels", label: "Channels", icon: Webhook },
   { key: "appearance", label: "Appearance", icon: Palette },
 ];
 
 // Which fields belong to each section (used for partial saves)
 const sectionFields: Record<SectionKey, (keyof SettingsData)[]> = {
-  general: ["businessName", "businessDesc", "appName", "appNameShort", "welcomeMessage", "tone", "language"],
+  general: ["businessName", "businessDesc", "appName", "appNameShort", "welcomeMessage", "tone", "language", "autoReplyEnabled"],
   ai: ["aiProvider", "aiModel", "aiApiKey", "aiBaseUrl", "maxTokens", "temperature"],
   voice: ["elevenLabsKey", "elevenLabsVoice"],
   phone: ["twilioSid", "twilioToken", "twilioPhone"],
@@ -113,6 +131,7 @@ const sectionFields: Record<SectionKey, (keyof SettingsData)[]> = {
     "imapPass",
   ],
   whatsapp: ["whatsappMode", "whatsappApiKey", "whatsappPhone"],
+  channels: [],
   appearance: ["themePreset", "themeOverridesLight", "themeOverridesDark", "themeLogoUrl", "themeLogoDarkUrl", "themeFaviconUrl"],
 };
 
@@ -378,7 +397,7 @@ function GeneralSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
+  update: (field: keyof SettingsData, value: string | number | boolean | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -447,6 +466,27 @@ function GeneralSection({
           ]}
         />
       </FormField>
+      <FormField label="Global Auto-Reply" description="Enable AI auto-reply for all channels by default. Can be overridden per-channel or per-message (n8n payload).">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => update("autoReplyEnabled", !data.autoReplyEnabled)}
+            className={cn(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              data.autoReplyEnabled ? "bg-owly-primary" : "bg-owly-border"
+            )}
+          >
+            <span
+              className={cn(
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                data.autoReplyEnabled ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+          <span className="text-sm text-owly-text-light">
+            {data.autoReplyEnabled ? "Enabled" : "Disabled"}
+          </span>
+        </div>
+      </FormField>
     </div>
   );
 }
@@ -456,7 +496,7 @@ function AISection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
+  update: (field: keyof SettingsData, value: string | number | boolean | Record<string, string>) => void;
 }) {
   const [dynamicModels, setDynamicModels] = useState<{ value: string; label: string; vision?: boolean }[] | null>(null);
   const [fetchingModels, setFetchingModels] = useState(false);
@@ -595,7 +635,7 @@ function VoiceSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
+  update: (field: keyof SettingsData, value: string | number | boolean | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -627,7 +667,7 @@ function PhoneSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
+  update: (field: keyof SettingsData, value: string | number | boolean | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -666,7 +706,7 @@ function EmailSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
+  update: (field: keyof SettingsData, value: string | number | boolean | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -771,7 +811,7 @@ function WhatsAppSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
+  update: (field: keyof SettingsData, value: string | number | boolean | Record<string, string>) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -817,7 +857,7 @@ function AppearanceSection({
   update,
 }: {
   data: SettingsData;
-  update: (field: keyof SettingsData, value: string | number | Record<string, string>) => void;
+  update: (field: keyof SettingsData, value: string | number | boolean | Record<string, string>) => void;
 }) {
   const { setAppearance } = useThemeAppearance();
   const { toast } = useToast();
@@ -1085,6 +1125,269 @@ function AppearanceSection({
 }
 
 // ---------------------------------------------------------------------------
+// Channels Section (custom webhook channels)
+// ---------------------------------------------------------------------------
+
+function ChannelsSection({
+  data,
+  update,
+  addToast,
+}: {
+  data: SettingsData;
+  update: (field: keyof SettingsData, value: string | number | Record<string, string> | boolean) => void;
+  addToast: (type: "success" | "error", message: string) => void;
+}) {
+  const [channels, setChannels] = useState<CustomChannel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const fetchChannels = useCallback(() => {
+    fetch("/api/channels")
+      .then((r) => r.json())
+      .then((data: CustomChannel[]) => {
+        setChannels(Array.isArray(data) ? data : []);
+      })
+      .catch(() => addToast("error", "Failed to load channels"))
+      .finally(() => setLoading(false));
+  }, [addToast]);
+
+  useEffect(() => {
+    fetchChannels();
+  }, [fetchChannels]);
+
+  const updateChannel = async (ch: CustomChannel, changes: Partial<CustomChannel>) => {
+    setSavingId(ch.type);
+    try {
+      const res = await fetch("/api/channels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: ch.type,
+          ...changes,
+        }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      addToast("success", `Channel '${ch.displayName || ch.type}' updated`);
+      fetchChannels();
+    } catch {
+      addToast("error", "Failed to update channel");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-owly-primary" />
+      </div>
+    );
+  }
+
+  const customChannels = channels.filter((ch) => ch.isCustom);
+  const builtinChannels = channels.filter((ch) => !ch.isCustom);
+
+  return (
+    <div className="space-y-6">
+      {/* Global auto-reply setting */}
+      <div className="border border-owly-border rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium text-owly-text">Global Auto-Reply</label>
+            <p className="text-xs text-owly-text-light mt-0.5">
+              Default for all channels. Can be overridden per-channel or per-message (n8n payload).
+            </p>
+          </div>
+          <button
+            onClick={() => update("autoReplyEnabled", !data.autoReplyEnabled)}
+            className={cn(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              data.autoReplyEnabled ? "bg-owly-primary" : "bg-owly-border"
+            )}
+          >
+            <span
+              className={cn(
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                data.autoReplyEnabled ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Custom channels */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-owly-text">Custom Channels</h4>
+        <p className="text-xs text-owly-text-light">
+          Custom channels are auto-created when n8n sends an inbound message with a new channel name.
+          Configure the outbound webhook URL so staff replies can be delivered back to the channel.
+        </p>
+
+        {customChannels.length === 0 && (
+          <div className="text-sm text-owly-text-light italic py-4 text-center border border-dashed border-owly-border rounded-lg">
+            No custom channels yet. They appear automatically when n8n sends the first message.
+          </div>
+        )}
+
+        {customChannels.map((ch) => (
+          <div
+            key={ch.type}
+            className={cn(
+              "border rounded-lg p-4 space-y-3",
+              ch.isActive
+                ? "border-owly-border bg-owly-bg"
+                : "border-owly-border bg-owly-bg opacity-60"
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Radio
+                  className={cn(
+                    "h-4 w-4",
+                    ch.isActive ? "text-green-500" : "text-owly-text-light"
+                  )}
+                />
+                <span className="text-sm font-medium text-owly-text">
+                  {ch.displayName || ch.type}
+                </span>
+                <code className="text-xs text-owly-text-light bg-owly-bg px-1.5 py-0.5 rounded">
+                  {ch.type}
+                </code>
+              </div>
+              <button
+                onClick={() =>
+                  updateChannel(ch, {
+                    isActive: !ch.isActive,
+                    disabledReason: ch.isActive ? "Manually disabled from settings" : "",
+                  })
+                }
+                disabled={savingId === ch.type}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  ch.isActive ? "bg-owly-primary" : "bg-owly-border"
+                )}
+              >
+                {savingId === ch.type && (
+                  <Loader2 className="absolute h-3 w-3 animate-spin text-white left-1/2 -translate-x-1/2" />
+                )}
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                    ch.isActive ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </button>
+            </div>
+
+            {ch.isActive && (
+              <>
+                <div>
+                  <label className="text-xs font-medium text-owly-text-light">Display Name</label>
+                  <input
+                    type="text"
+                    value={ch.displayName}
+                    onChange={(e) => {
+                      const updated = channels.map((c) =>
+                        c.type === ch.type ? { ...c, displayName: e.target.value } : c
+                      );
+                      setChannels(updated);
+                    }}
+                    onBlur={(e) => updateChannel(ch, { displayName: e.target.value })}
+                    className="mt-1 w-full px-3 py-1.5 text-sm rounded-lg border border-owly-border bg-owly-surface text-owly-text focus:outline-none focus:ring-2 focus:ring-owly-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-owly-text-light">
+                    Outbound Webhook URL (n8n reply endpoint)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://workflow.example.com/webhook/owly-reply"
+                    value={ch.outboundWebhookUrl}
+                    onChange={(e) => {
+                      const updated = channels.map((c) =>
+                        c.type === ch.type ? { ...c, outboundWebhookUrl: e.target.value } : c
+                      );
+                      setChannels(updated);
+                    }}
+                    onBlur={(e) => updateChannel(ch, { outboundWebhookUrl: e.target.value })}
+                    className="mt-1 w-full px-3 py-1.5 text-sm rounded-lg border border-owly-border bg-owly-surface text-owly-text focus:outline-none focus:ring-2 focus:ring-owly-primary"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-medium text-owly-text-light">
+                      Channel Auto-Reply
+                    </label>
+                    <p className="text-xs text-owly-text-light mt-0.5">
+                      Override global setting for this channel only.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      updateChannel(ch, { autoReplyEnabled: !ch.autoReplyEnabled })
+                    }
+                    disabled={savingId === ch.type}
+                    className={cn(
+                      "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
+                      ch.autoReplyEnabled ? "bg-owly-primary" : "bg-owly-border"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform",
+                        ch.autoReplyEnabled ? "translate-x-5" : "translate-x-1"
+                      )}
+                    />
+                  </button>
+                </div>
+              </>
+            )}
+
+            {!ch.isActive && ch.disabledReason && (
+              <p className="text-xs text-owly-text-light italic">
+                Disabled: {ch.disabledReason}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Built-in channels status (read-only) */}
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-owly-text">Built-in Channels</h4>
+        <div className="grid grid-cols-2 gap-2">
+          {builtinChannels.map((ch) => (
+            <div
+              key={ch.type}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-owly-border bg-owly-bg text-sm"
+            >
+              <Radio
+                className={cn(
+                  "h-3.5 w-3.5",
+                  ch.isActive ? "text-green-500" : "text-owly-text-light"
+                )}
+              />
+              <span className="text-owly-text capitalize">{ch.type}</span>
+              <span
+                className={cn(
+                  "ml-auto text-xs",
+                  ch.isActive ? "text-green-500" : "text-owly-text-light"
+                )}
+              >
+                {ch.isActive ? "Active" : "Inactive"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main settings page
 // ---------------------------------------------------------------------------
 
@@ -1125,6 +1428,7 @@ const defaultSettings: SettingsData = {
   themeFaviconUrl: "",
   appName: "Owly",
   appNameShort: "Owly",
+  autoReplyEnabled: true,
 };
 
 export default function SettingsPage() {
@@ -1180,7 +1484,7 @@ export default function SettingsPage() {
       .finally(() => setLoading(false));
   }, [addToast]);
 
-  const update = (field: keyof SettingsData, value: string | number | Record<string, string>) => {
+  const update = (field: keyof SettingsData, value: string | number | boolean | Record<string, string>) => {
     setData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -1235,6 +1539,7 @@ export default function SettingsPage() {
     phone: <PhoneSection data={data} update={update} />,
     email: <EmailSection data={data} update={update} />,
     whatsapp: <WhatsAppSection data={data} update={update} />,
+    channels: <ChannelsSection data={data} update={update} addToast={addToast} />,
     appearance: <AppearanceSection data={data} update={update} />,
   };
 
@@ -1296,6 +1601,8 @@ export default function SettingsPage() {
                   "Set up email sending and receiving for support tickets."}
                 {activeTab === "whatsapp" &&
                   "Configure WhatsApp integration for messaging support."}
+                {activeTab === "channels" &&
+                  "Manage custom webhook channels (n8n, integrations). Channels auto-create on first message."}
                 {activeTab === "appearance" &&
                   "Customize the look and feel of your Owly instance."}
               </p>

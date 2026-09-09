@@ -180,6 +180,7 @@ export const updateSettingsSchema = z.object({
   themeFaviconUrl: z.string().max(2000).regex(/^$|^https?:\/\/|^\/[^\/]/, "Must be a URL starting with http://, https://, or /").optional(),
   appName: z.string().max(100).optional(),
   appNameShort: z.string().max(50).optional(),
+  autoReplyEnabled: z.boolean().optional(),
 }).strict();
 
 // Canned Responses

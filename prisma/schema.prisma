@@ -47,6 +47,7 @@ model Settings {
   themeFaviconUrl String   @default("")
   appName         String   @default("Owly")
   appNameShort    String   @default("Owly")
+  autoReplyEnabled    Boolean @default(true)
   telegramBotToken    String   @default("")
   createdAt           DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -228,13 +229,20 @@ model CallLog {
 // ==================== CHANNELS ====================
 
 model Channel {
-  id        String   @id @default(uuid())
-  type      String   @unique
-  isActive  Boolean  @default(false)
-  config    Json     @default("{}")
-  status    String   @default("disconnected")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String    @id @default(uuid())
+  type                  String    @unique
+  isActive              Boolean   @default(false)
+  config                Json      @default("{}")
+  status                String    @default("disconnected")
+  isCustom              Boolean   @default(false)
+  displayName           String    @default("")
+  outboundWebhookUrl     String    @default("")
+  outboundWebhookHeaders Json     @default("{}")
+  autoReplyEnabled      Boolean   @default(true)
+  disabledAt            DateTime?
+  disabledReason        String    @default("")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 }
 
 // ==================== SCHEDULES ====================

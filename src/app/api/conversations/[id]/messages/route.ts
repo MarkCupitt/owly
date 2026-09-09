@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { requireAuth, isAuthenticated } from "@/lib/route-auth";
 import { emitNewMessage } from "@/lib/realtime";
+import { fireOutboundWebhook } from "@/lib/channels/outbound-webhook";
 
 export async function GET(
   request: NextRequest,
@@ -87,6 +88,13 @@ export async function POST(
     });
 
     emitNewMessage(id, { id: message.id, role: messageRole, content: content.trim() });
+
+    // Fire outbound webhook for custom channels (staff/canned replies always fire)
+    if (messageRole === "assistant") {
+      fireOutboundWebhook(id, content.trim()).catch((err) =>
+        logger.error("[Messages] Outbound webhook error:", err)
+      );
+    }
 
     return NextResponse.json(message, { status: 201 });
   } catch (error) {
