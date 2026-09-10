@@ -1,13 +1,19 @@
 /**
- * Owly Live Chat Widget
+ * Live Chat Widget
  * Embeddable chat widget for customer websites.
  *
  * Usage:
- * <script src="https://your-owly-instance.com/widget/owly-chat.js"
- *   data-server="https://your-owly-instance.com"
+ * <script src="https://your-instance.com/widget/owly-chat.js"
+ *   data-server="https://your-instance.com"
  *   data-color="#0F172A"
  *   data-position="right"
  *   data-greeting="Hi! How can we help you today?"
+ *   data-title="Support Chat"
+ *   data-customer-email="user@example.com"
+ *   data-customer-name="John Doe"
+ *   data-customer-id="external-user-id"
+ *   data-customer-system="powerdeck"
+ *   data-auth-token="bearer-token"
  * ></script>
  */
 (function () {
@@ -20,6 +26,11 @@
     position: script.getAttribute("data-position") || "right",
     greeting: script.getAttribute("data-greeting") || "Hi! How can we help you today?",
     title: script.getAttribute("data-title") || "Support Chat",
+    customerEmail: script.getAttribute("data-customer-email") || "",
+    customerName: script.getAttribute("data-customer-name") || "",
+    customerId: script.getAttribute("data-customer-id") || "",
+    customerSystem: script.getAttribute("data-customer-system") || "",
+    authToken: script.getAttribute("data-auth-token") || "",
   };
 
   var conversationId = null;
@@ -108,15 +119,24 @@
 
     var typing = addMessage("Typing...", "bot typing");
 
+    var payload = {
+      message: text,
+      conversationId: conversationId,
+      channel: "widget",
+      customerName: config.customerName || "Website Visitor",
+    };
+
+    if (config.customerEmail) payload.customerEmail = config.customerEmail;
+    if (config.customerId) payload.customerId = config.customerId;
+    if (config.customerSystem) payload.customerSystem = config.customerSystem;
+
+    var headers = { "Content-Type": "application/json" };
+    if (config.authToken) headers["Authorization"] = "Bearer " + config.authToken;
+
     fetch(config.server + "/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: text,
-        conversationId: conversationId,
-        channel: "widget",
-        customerName: "Website Visitor",
-      }),
+      headers: headers,
+      body: JSON.stringify(payload),
     })
       .then(function (res) { return res.json(); })
       .then(function (data) {

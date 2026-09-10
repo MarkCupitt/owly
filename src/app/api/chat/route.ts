@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chat, createNewConversation } from "@/lib/ai/engine";
+import { resolveCustomer } from "@/lib/customer-resolver";
 import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, conversationId, channel, customerName, customerContact } = body;
+    const {
+      message,
+      conversationId,
+      channel,
+      customerName,
+      customerContact,
+      customerEmail,
+      customerId,
+      customerSystem,
+    } = body;
 
     if (!message || typeof message !== "string" || !message.trim()) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
@@ -18,11 +28,27 @@ export async function POST(request: NextRequest) {
     let convId = conversationId;
 
     if (!convId) {
-      const conversation = await createNewConversation(
-        channel || "api",
-        customerName || "API User",
-        customerContact || ""
-      );
+      const ch = channel || "widget";
+      let name = customerName || "Website Visitor";
+      let contact = customerContact || "";
+
+      if (customerId && customerSystem) {
+        contact = customerId;
+      } else if (customerEmail) {
+        contact = customerEmail;
+      }
+
+      if (contact) {
+        try {
+          await resolveCustomer(ch, contact, name, {
+            senderEmail: customerEmail,
+          });
+        } catch (err) {
+          logger.error("Failed to resolve customer:", err);
+        }
+      }
+
+      const conversation = await createNewConversation(ch, name, contact);
       convId = conversation.id;
     }
 
