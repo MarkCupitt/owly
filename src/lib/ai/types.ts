@@ -83,6 +83,7 @@ export interface ConversationContext {
   customerName: string;
   customerHistory: string[];
   channel: string;
+  appName: string;
 }
 
 export interface KnowledgeItem {

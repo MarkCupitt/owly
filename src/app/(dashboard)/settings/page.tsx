@@ -66,6 +66,7 @@ interface SettingsData {
   themeFaviconUrl: string;
   appName: string;
   appNameShort: string;
+  systemName: string;
   autoReplyEnabled: boolean;
 }
 
@@ -115,7 +116,7 @@ const tabs: TabDef[] = [
 
 // Which fields belong to each section (used for partial saves)
 const sectionFields: Record<SectionKey, (keyof SettingsData)[]> = {
-  general: ["businessName", "businessDesc", "appName", "appNameShort", "welcomeMessage", "tone", "language", "autoReplyEnabled"],
+  general: ["businessName", "businessDesc", "appName", "appNameShort", "systemName", "welcomeMessage", "tone", "language", "autoReplyEnabled"],
   ai: ["aiProvider", "aiModel", "aiApiKey", "aiBaseUrl", "maxTokens", "temperature"],
   voice: ["elevenLabsKey", "elevenLabsVoice"],
   phone: ["twilioSid", "twilioToken", "twilioPhone"],
@@ -427,6 +428,13 @@ function GeneralSection({
           value={data.appNameShort}
           onChange={(v) => update("appNameShort", v)}
           placeholder="e.g. PowerDeck"
+        />
+      </FormField>
+      <FormField label="System Name" description="Used for browser tab titles, PWA titles, and system-level branding.">
+        <TextInput
+          value={data.systemName}
+          onChange={(v) => update("systemName", v)}
+          placeholder="e.g. HelpDesk"
         />
       </FormField>
       <FormField label="Welcome Message" description="The greeting message sent to new customers.">
@@ -820,7 +828,7 @@ function WhatsAppSection({
           Choose between WhatsApp Web (free, requires QR scan) or the official WhatsApp Business API (paid, more reliable).
         </p>
       </div>
-      <FormField label="Connection Mode" description="Select how Owly connects to WhatsApp.">
+      <FormField label="Connection Mode" description="Select how the system connects to WhatsApp.">
         <SelectInput
           value={data.whatsappMode}
           onChange={(v) => update("whatsappMode", v)}
@@ -884,6 +892,7 @@ function AppearanceSection({
       themeFaviconUrl: data.themeFaviconUrl,
       appName: data.appName,
       appNameShort: data.appNameShort,
+      systemName: data.systemName,
     });
   }
 
@@ -936,7 +945,7 @@ function AppearanceSection({
 
   return (
     <div className="space-y-5">
-      <FormField label="Theme Preset" description="Choose a color theme for your Owly instance.">
+      <FormField label="Theme Preset" description="Choose a color theme for your instance.">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
           {THEME_PRESETS.map((preset) => (
             <button
@@ -1271,8 +1280,9 @@ const defaultSettings: SettingsData = {
   themeLogoUrl: "",
   themeLogoDarkUrl: "",
   themeFaviconUrl: "",
-  appName: "Owly",
-  appNameShort: "Owly",
+  appName: "HelpDesk",
+  appNameShort: "HelpDesk",
+  systemName: "HelpDesk",
   autoReplyEnabled: true,
 };
 
@@ -1320,8 +1330,9 @@ export default function SettingsPage() {
             themeLogoUrl: settings.themeLogoUrl || "",
             themeLogoDarkUrl: settings.themeLogoDarkUrl || "",
             themeFaviconUrl: settings.themeFaviconUrl || "",
-            appName: settings.appName || "Owly",
-            appNameShort: settings.appNameShort || "Owly",
+            appName: settings.appName || "HelpDesk",
+            appNameShort: settings.appNameShort || "HelpDesk",
+            systemName: settings.systemName || "HelpDesk",
           });
         }
       })
@@ -1391,7 +1402,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <>
-        <Header title="Settings" description="Configure your Owly instance" />
+        <Header title="Settings" description="Configure your instance" />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-owly-primary" />
         </div>
@@ -1401,7 +1412,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <Header title="Settings" description="Configure your Owly instance" />
+      <Header title="Settings" description="Configure your instance" />
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-4xl mx-auto">
           {/* Tab navigation */}
@@ -1451,7 +1462,7 @@ export default function SettingsPage() {
                 {activeTab === "channels" &&
                   "Manage custom webhook channels (inbound webhooks, integrations). Channels auto-create on first message."}
                 {activeTab === "appearance" &&
-                  "Customize the look and feel of your Owly instance."}
+                  "Customize the look and feel of your instance."}
               </p>
             </div>
 

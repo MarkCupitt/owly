@@ -75,14 +75,14 @@ export default function LoginPage() {
       <div className="flex flex-col items-center mb-8">
         <Image
           src={themeLogoUrl || "/owly.png"}
-          alt="Owly"
+          alt={appName || "HelpDesk"}
           width={56}
           height={56}
           className="mb-4"
           unoptimized
         />
         <h1 className="text-2xl font-bold text-owly-text">
-          Welcome to {appName || "Owly"}
+          Welcome to {appName || "HelpDesk"}
         </h1>
         <p className="text-owly-text-light text-sm mt-1">
           Sign in to your account

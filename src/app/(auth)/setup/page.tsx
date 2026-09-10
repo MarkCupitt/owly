@@ -183,9 +183,9 @@ export default function SetupPage() {
       {/* Header */}
       <div className="bg-owly-primary-50 border-b border-owly-border px-8 pt-6 pb-4">
         <div className="flex items-center gap-3 mb-5">
-          <Image src={themeLogoUrl || "/owly.png"} alt="Owly" width={40} height={40} unoptimized />
+          <Image src={themeLogoUrl || "/owly.png"} alt={appName || "HelpDesk"} width={40} height={40} unoptimized />
           <div>
-            <h1 className="text-lg font-bold text-owly-text">Set Up {appName || "Owly"}</h1>
+            <h1 className="text-lg font-bold text-owly-text">Set Up {appName || "HelpDesk"}</h1>
             <p className="text-xs text-owly-text-light">
               Step {step + 1} of {STEPS.length}
             </p>
@@ -264,7 +264,7 @@ export default function SetupPage() {
         {step === 1 && (
           <>
             <p className="text-sm text-owly-text-light mb-6">
-              Tell us about your business so Owly can represent you.
+              Tell us about your business so the system can represent you.
             </p>
             <div className="space-y-4">
               <Field
@@ -439,7 +439,7 @@ export default function SetupPage() {
         {step === 3 && (
           <>
             <p className="text-sm text-owly-text-light mb-6">
-              Your Owly instance is ready to go.
+              Your instance is ready to go.
             </p>
             <div className="space-y-3 mb-6">
               <SummaryRow

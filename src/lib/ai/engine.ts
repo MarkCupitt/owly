@@ -33,7 +33,7 @@ function buildSystemPrompt(context: ConversationContext): string {
           .join("\n\n---\n\n")
       : "No specific knowledge base entries available. Answer based on general knowledge about the business.";
 
-  return `You are Owly, the AI customer support assistant for ${context.businessName}.
+  return `You are ${context.appName}, the AI customer support assistant for ${context.businessName}.
 
 ${context.businessDesc ? `About the business: ${context.businessDesc}` : ""}
 
@@ -98,6 +98,7 @@ async function getAIConfig(): Promise<AIConfig & ConversationContext> {
     customerName: "",
     customerHistory: [],
     channel: "",
+    appName: settings.appName,
   };
 }
 

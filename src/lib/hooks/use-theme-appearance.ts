@@ -12,6 +12,7 @@ interface ThemeAppearanceStore {
   themeFaviconUrl: string;
   appName: string;
   appNameShort: string;
+  systemName: string;
   setAppearance: (data: Partial<Omit<ThemeAppearanceStore, "setAppearance" | "applyTheme" | "hydrated">>) => void;
   hydrated: boolean;
   setHydrated: (v: boolean) => void;
@@ -26,8 +27,9 @@ export const useThemeAppearance = create<ThemeAppearanceStore>()(
       themeLogoUrl: "",
       themeLogoDarkUrl: "",
       themeFaviconUrl: "",
-      appName: "Owly",
-      appNameShort: "Owly",
+      appName: "HelpDesk",
+      appNameShort: "HelpDesk",
+      systemName: "HelpDesk",
       setAppearance: (data) => set(data),
       hydrated: false,
       setHydrated: (v) => set({ hydrated: v }),

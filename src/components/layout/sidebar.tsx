@@ -100,7 +100,7 @@ export function Sidebar() {
       <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
         <Image
           src={logoSrc}
-          alt="Owly"
+          alt={appNameShort || "HelpDesk"}
           width={32}
           height={32}
           className="rounded-lg flex-shrink-0"
@@ -108,7 +108,7 @@ export function Sidebar() {
         />
         {!collapsed && (
           <div className="overflow-hidden">
-            <h1 className="text-base font-bold tracking-tight">{appNameShort || "Owly"}</h1>
+            <h1 className="text-base font-bold tracking-tight">{appNameShort || "HelpDesk"}</h1>
             <p className="text-[10px] text-white/50">AI Customer Support</p>
           </div>
         )}

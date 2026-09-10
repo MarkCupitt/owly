@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { ThemeInit } from "@/components/theme-init";
+import { SystemNameInit } from "@/components/system-name-init";
 import "./globals.css";
 
 const inter = Inter({
@@ -10,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Owly - AI Customer Support",
-  description: "Open-source AI-powered customer support agent",
+  title: "HelpDesk",
+  description: "AI-powered customer support system",
   icons: {
     icon: "/owly.png",
   },
@@ -27,6 +28,7 @@ export default function RootLayout({
       <body className="h-full">
           <Providers>
             <ThemeInit />
+            <SystemNameInit />
             {children}
           </Providers>
         </body>
