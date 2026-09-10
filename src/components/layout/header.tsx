@@ -4,6 +4,7 @@ import { Search, Sun, Moon, LogOut, User } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useTheme } from "@/lib/hooks/use-theme";
 import { useRouter } from "next/navigation";
+import { NotificationBell } from "./notification-bell";
 
 interface HeaderProps {
   title: string;
@@ -63,6 +64,8 @@ export function Header({ title, description, actions }: HeaderProps) {
         >
           <Search className="h-5 w-5" />
         </button>
+
+        <NotificationBell />
 
         <button
           onClick={toggleTheme}

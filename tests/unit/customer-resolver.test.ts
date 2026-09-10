@@ -26,6 +26,9 @@ describe("resolveCustomer — cross-channel matching", () => {
     (prisma.customer.findUnique as ReturnType<typeof vi.fn>).mockReset();
     (prisma.customer.create as ReturnType<typeof vi.fn>).mockReset();
     (prisma.customer.update as ReturnType<typeof vi.fn>).mockReset();
+    (prisma.customerChannelLink.findUnique as ReturnType<typeof vi.fn>).mockReset();
+    (prisma.customerChannelLink.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (prisma.customerChannelLink.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({});
   });
 
   describe("Step 1: Channel-specific ID match", () => {

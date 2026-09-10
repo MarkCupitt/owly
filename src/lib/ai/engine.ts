@@ -1,8 +1,14 @@
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import { owlyTools, executeToolCall } from "./tools";
 import { emitNewMessage } from "@/lib/realtime";
 import { analyzeSentiment, detectIntent, estimateConfidence, requiresHumanApproval } from "./guardrails";
 import { createProvider } from "./providers";
+import { evaluateRules } from "@/lib/automation";
+import { linkUpstreamIdentity } from "@/lib/upstream-identity";
+import { isFakeEmailSync, extractEmail } from "@/lib/fake-email";
+import { createNotification } from "@/lib/notifications";
+import { checkAndProposeMatches } from "@/lib/customer-matcher";
 import type {
   AIMessage,
   AIConfig,
@@ -56,6 +62,10 @@ ${knowledgeSection}
 - Keep responses concise but thorough
 - The customer is contacting via: ${context.channel}
 ${context.customerName !== "Unknown" ? `- Customer name: ${context.customerName}` : ""}
+${context.customerIdentified === true ? `- Customer is identified and linked to ${context.upstreamSystemLabel || "upstream system"}` : ""}
+
+## Customer Identification
+${context.customerIdentified === false && context.identificationPrompt ? `- If the customer hasn't provided their email yet, ask for it using this prompt: "${context.identificationPrompt}"\n- Once the customer provides an email, acknowledge it and continue helping them.` : ""}
 
 ## Customer History
 ${context.customerHistory.length > 0 ? context.customerHistory.join("\n") : "This is the customer's first interaction."}`;
@@ -99,6 +109,10 @@ async function getAIConfig(): Promise<AIConfig & ConversationContext> {
     customerHistory: [],
     channel: "",
     appName: settings.appName,
+    upstreamSystemLabel: settings.upstreamIdentitySystemLabel || undefined,
+    identificationPrompt: settings.customerIdentificationEnabled
+      ? (settings.customerIdentificationPrompt || "").replace(/\{system_label\}/g, settings.upstreamIdentitySystemLabel || "our system")
+      : undefined,
   };
 }
 
@@ -125,13 +139,74 @@ export async function chat(
 
   const knowledgeBase = await getKnowledgeBase();
 
+  // Get customer info for identification context
+  let customerIdentified: boolean | undefined;
+  let customerEmail: string | undefined;
+  if (conversation.customerId) {
+    const customer = await prisma.customer.findUnique({
+      where: { id: conversation.customerId },
+      select: { email: true, externalId: true, name: true },
+    });
+    if (customer) {
+      customerEmail = customer.email || undefined;
+      customerIdentified = !!customer.externalId || (!!customer.email && !isFakeEmailSync(customer.email, ["facebook.com"]));
+    }
+  }
+
   const context: ConversationContext = {
     ...config,
     knowledgeBase,
     customerName: conversation.customerName,
     channel: conversation.channel,
     customerHistory: [],
+    customerIdentified,
+    customerEmail,
   };
+
+  // Email detection: check if the user message contains an email
+  if (conversation.customerId) {
+    const detectedEmail = extractEmail(userMessage);
+    if (detectedEmail && !isFakeEmailSync(detectedEmail, ["facebook.com"])) {
+      const customer = await prisma.customer.findUnique({
+        where: { id: conversation.customerId },
+        select: { email: true, externalId: true },
+      });
+      if (customer && (!customer.email || isFakeEmailSync(customer.email, ["facebook.com"]))) {
+        await prisma.customer.update({
+          where: { id: conversation.customerId },
+          data: { email: detectedEmail },
+        });
+        // Trigger upstream identity lookup
+        if (!customer.externalId) {
+          linkUpstreamIdentity(conversation.customerId, detectedEmail).catch((err) => {
+            logger.error("Upstream identity lookup failed", { error: err });
+          });
+        }
+      }
+    }
+  }
+
+  // Evaluate automation rules
+  try {
+    const matchedActions = await evaluateRules(
+      { content: userMessage, channel: conversation.channel, customerName: conversation.customerName },
+      { id: conversationId, channel: conversation.channel, customerName: conversation.customerName }
+    );
+    for (const action of matchedActions) {
+      if (action.type === "keyword_alert") {
+        await createNotification({
+          type: "automation",
+          title: `Keyword Alert: ${action.ruleName}`,
+          message: `Triggered by message: "${userMessage.substring(0, 100)}"`,
+          entityId: conversationId,
+          entityType: "conversation",
+          metadata: { ruleId: action.ruleId, actions: action.actions },
+        });
+      }
+    }
+  } catch (err) {
+    logger.error("Automation rule evaluation failed", { error: err });
+  }
 
   // Build message history
   const messages: AIMessage[] = [

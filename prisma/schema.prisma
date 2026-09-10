@@ -49,6 +49,24 @@ model Settings {
   appNameShort    String   @default("HelpDesk")
   systemName      String   @default("HelpDesk")
   autoReplyEnabled    Boolean @default(true)
+  // Upstream identity integration
+  upstreamIdentityEnabled       Boolean @default(false)
+  upstreamIdentityUrl           String  @default("")
+  upstreamIdentityApiKey        String  @default("")
+  upstreamIdentityApiKeyHeader  String  @default("Authorization")
+  upstreamIdentityApiKeyPrefix  String  @default("Bearer ")
+  upstreamIdentitySystemLabel   String  @default("")
+  upstreamIdentityResponseUserIdField    String  @default("user_id")
+  upstreamIdentityResponseNameField      String  @default("display_name")
+  upstreamIdentityResponseFirstNameField String  @default("first_name")
+  upstreamIdentityResponseLastNameField  String  @default("last_name")
+  upstreamIdentityResponsePhotoField     String  @default("photo_url")
+  // Customer identification (AI-driven email collection)
+  customerIdentificationEnabled          Boolean @default(false)
+  customerIdentificationPrompt           String  @default("Are you already a {system_label} user? Please provide your registered email address. Or, to better help you and provide meaningful responses and docs, please provide your email address so we can better serve your enquiries.")
+  customerIdentificationFoundResponse    String  @default("Thanks {name}! I've found your {system_label} account. How can I help you today?")
+  customerIdentificationNotFoundResponse String  @default("Thanks! I've noted your email. How can I help you today?")
+  fakeEmailDomains                       String  @default("facebook.com")
   telegramBotToken    String   @default("")
   createdAt           DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -345,22 +363,26 @@ model CannedResponse {
 // ==================== CUSTOMERS ====================
 
 model Customer {
-  id            String         @id @default(uuid())
+  id            String              @id @default(uuid())
   name          String
-  email         String         @default("")
-  phone         String         @default("")
-  whatsapp      String         @default("")
-  facebookId    String         @default("")
-  instagramId   String         @default("")
-  tags          String         @default("") // comma-separated
-  isBlocked     Boolean        @default(false)
+  email         String              @default("")
+  phone         String              @default("")
+  whatsapp      String              @default("")
+  facebookId    String              @default("")
+  instagramId   String              @default("")
+  externalId    String              @default("")
+  externalSystem String             @default("")
+  profilePicUrl String              @default("")
+  tags          String              @default("") // comma-separated
+  isBlocked     Boolean             @default(false)
   notes         CustomerNote[]
   conversations Conversation[]
-  metadata      Json           @default("{}")
-  firstContact  DateTime       @default(now())
-  lastContact   DateTime       @default(now())
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  channelLinks  CustomerChannelLink[]
+  metadata      Json                @default("{}")
+  firstContact  DateTime            @default(now())
+  lastContact   DateTime            @default(now())
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@index([email])
   @@index([phone])
@@ -368,6 +390,7 @@ model Customer {
   @@index([facebookId])
   @@index([instagramId])
   @@index([lastContact])
+  @@index([externalId, externalSystem])
 }
 
 model CustomerNote {
@@ -379,6 +402,52 @@ model CustomerNote {
   createdAt  DateTime @default(now())
 
   @@index([customerId])
+}
+
+model CustomerChannelLink {
+  id          String   @id @default(uuid())
+  customerId  String
+  channel     String   // "messenger", "instagram", "email", "webform", "sms", etc.
+  externalId  String   // PSID, IGSID, email address, form submission ID, phone, etc.
+  metadata    Json     @default("{}") // channel-specific data
+  createdAt   DateTime @default(now())
+
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([channel, externalId])
+  @@index([customerId])
+}
+
+model CustomerMatchProposal {
+  id              String    @id @default(uuid())
+  customerId      String    // the new customer
+  proposedMatchId String    // the existing customer that might be a duplicate
+  matchType       String    // "name_exact", "name_fuzzy", "email_domain"
+  confidence      String    // "high", "medium", "low"
+  status          String    @default("pending") // pending | approved | rejected
+  createdAt       DateTime  @default(now())
+  resolvedAt      DateTime?
+  resolvedBy      String?
+
+  @@index([status])
+  @@index([customerId])
+  @@index([proposedMatchId])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  type      String    // "escalation", "ticket", "automation", "system"
+  title     String
+  message   String
+  isRead    Boolean   @default(false)
+  entityId  String?
+  entityType String?
+  metadata  Json      @default("{}")
+  createdAt DateTime  @default(now())
+
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([type, isRead])
 }
 
 // ==================== AUTOMATION RULES ====================

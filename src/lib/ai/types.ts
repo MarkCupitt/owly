@@ -84,6 +84,10 @@ export interface ConversationContext {
   customerHistory: string[];
   channel: string;
   appName: string;
+  customerIdentified?: boolean;
+  customerEmail?: string;
+  upstreamSystemLabel?: string;
+  identificationPrompt?: string;
 }
 
 export interface KnowledgeItem {

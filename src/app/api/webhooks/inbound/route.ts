@@ -5,6 +5,11 @@ import { resolveCustomer } from "@/lib/customer-resolver";
 import { chat, createNewConversation } from "@/lib/ai/engine";
 import { emitNewMessage } from "@/lib/realtime";
 import { fireOutboundWebhook } from "@/lib/channels/outbound-webhook";
+import { evaluateRules } from "@/lib/automation";
+import { createNotification } from "@/lib/notifications";
+import { linkUpstreamIdentity } from "@/lib/upstream-identity";
+import { isFakeEmailSync, extractEmail } from "@/lib/fake-email";
+import { checkAndProposeMatches } from "@/lib/customer-matcher";
 
 interface InboundPayload {
   channel: string;
@@ -179,6 +184,31 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ─── Email detection + upstream identity ─────────────
+    const detectedEmail = extractEmail(body.message);
+    if (detectedEmail && !isFakeEmailSync(detectedEmail, ["facebook.com"])) {
+      const customer = await prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { email: true, externalId: true },
+      });
+      if (customer && (!customer.email || isFakeEmailSync(customer.email, ["facebook.com"]))) {
+        await prisma.customer.update({
+          where: { id: customerId },
+          data: { email: detectedEmail },
+        });
+        if (!customer.externalId) {
+          linkUpstreamIdentity(customerId, detectedEmail).catch((err) =>
+            logger.error("[Inbound] Upstream identity lookup failed:", err)
+          );
+        }
+      }
+    }
+
+    // ─── Name-based match proposals ──────────────────────
+    checkAndProposeMatches(customerId, senderName).catch((err) =>
+      logger.error("[Inbound] Match proposal check failed:", err)
+    );
+
     // ─── Determine auto-reply and AI settings ──────────────
     // Priority: payload > channel config > global setting
     const globalSettings = await prisma.settings.findFirst();
@@ -195,6 +225,30 @@ export async function POST(request: NextRequest) {
       typeof body.useAI === "boolean"
         ? body.useAI
         : autoReply; // if useAI not specified, follow autoReply
+
+    // ─── Evaluate automation rules (for non-AI path) ─────
+    if (!useAI || !autoReply) {
+      try {
+        const matchedActions = await evaluateRules(
+          { content: body.message, channel: body.channel, customerName: senderName },
+          { id: conversation.id, channel: body.channel, customerName: senderName }
+        );
+        for (const action of matchedActions) {
+          if (action.type === "keyword_alert") {
+            await createNotification({
+              type: "automation",
+              title: `Keyword Alert: ${action.ruleName}`,
+              message: `Triggered by message: "${body.message.substring(0, 100)}"`,
+              entityId: conversation.id,
+              entityType: "conversation",
+              metadata: { ruleId: action.ruleId, actions: action.actions },
+            });
+          }
+        }
+      } catch (err) {
+        logger.error("[Inbound] Automation rule evaluation failed:", err);
+      }
+    }
 
     let autoReplied = false;
     let reply: string | null = null;
