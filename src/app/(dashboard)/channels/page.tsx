@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { CustomChannelsList, BuiltinChannelsGrid, type CustomChannel } from "@/components/channels/custom-channels-list";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,6 +32,12 @@ interface ChannelData {
   isActive: boolean;
   config: Record<string, unknown>;
   status: string;
+  isCustom?: boolean;
+  displayName?: string;
+  outboundWebhookUrl?: string;
+  outboundWebhookHeaders?: Record<string, string>;
+  autoReplyEnabled?: boolean;
+  disabledReason?: string;
 }
 
 type WhatsAppMode = "web" | "api";
@@ -857,6 +864,50 @@ export default function ChannelsPage() {
       status: "disconnected",
     };
 
+  const customChannelData: CustomChannel[] = channels.map((ch) => ({
+    id: ch.id,
+    type: ch.type,
+    isActive: ch.isActive,
+    isCustom: ch.isCustom ?? false,
+    displayName: ch.displayName ?? "",
+    outboundWebhookUrl: ch.outboundWebhookUrl ?? "",
+    outboundWebhookHeaders: ch.outboundWebhookHeaders ?? {},
+    autoReplyEnabled: ch.autoReplyEnabled ?? true,
+    status: ch.status,
+    disabledReason: ch.disabledReason ?? "",
+  }));
+
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const handleCustomToggle = async (ch: CustomChannel, updates: Partial<CustomChannel>) => {
+    setSavingId(ch.type);
+    try {
+      const res = await fetch(`/api/channels/${ch.type}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...updates }),
+      });
+      if (!res.ok) throw new Error("Failed to update channel");
+      const updated = await res.json();
+      setChannels((prev) =>
+        prev.map((c) => (c.type === ch.type ? { ...c, ...updated } : c))
+      );
+      showToast("Channel updated");
+    } catch {
+      showToast("Failed to update channel", "error");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleCustomUpdate = (ch: CustomChannel, field: keyof CustomChannel, value: string) => {
+    setChannels((prev) =>
+      prev.map((c) =>
+        c.type === ch.type ? { ...c, [field]: value } : c
+      )
+    );
+  };
+
   return (
     <>
       <Header
@@ -881,6 +932,7 @@ export default function ChannelsPage() {
             </button>
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl">
             <WhatsAppCard
               channel={getChannel("whatsapp")}
@@ -901,6 +953,19 @@ export default function ChannelsPage() {
               saving={saving}
             />
           </div>
+
+          {/* Custom channels and built-in status */}
+          <div className="max-w-7xl mt-8 space-y-6">
+            <CustomChannelsList
+              channels={customChannelData}
+              savingId={savingId}
+              onToggle={handleCustomToggle}
+              onUpdate={handleCustomUpdate}
+              onSave={() => {}}
+            />
+            <BuiltinChannelsGrid channels={customChannelData} />
+          </div>
+          </>
         )}
       </div>
 

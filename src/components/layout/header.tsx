@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Search, Sun, Moon, LogOut, User } from "lucide-react";
+import { Search, Sun, Moon, LogOut, User } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useTheme } from "@/lib/hooks/use-theme";
 import { useRouter } from "next/navigation";
@@ -74,11 +74,6 @@ export function Header({ title, description, actions }: HeaderProps) {
           ) : (
             <Sun className="h-5 w-5" />
           )}
-        </button>
-
-        <button className="relative p-2 text-owly-text-light hover:text-owly-text hover:bg-owly-primary-50 rounded-lg transition-colors">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-owly-danger rounded-full" />
         </button>
 
         {actions}
