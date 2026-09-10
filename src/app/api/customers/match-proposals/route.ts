@@ -27,5 +27,20 @@ export async function GET(request: NextRequest) {
     })
   );
 
-  return NextResponse.json({ proposals: enrichedProposals });
+  // Filter out stale proposals where either customer was deleted
+  const validProposals = enrichedProposals.filter(
+    (p) => p.customer !== null && p.proposedMatch !== null
+  );
+
+  // Clean up stale proposals in the background
+  if (validProposals.length < enrichedProposals.length) {
+    const staleIds = enrichedProposals
+      .filter((p) => p.customer === null || p.proposedMatch === null)
+      .map((p) => p.id);
+    prisma.customerMatchProposal.deleteMany({
+      where: { id: { in: staleIds } },
+    }).catch(() => {});
+  }
+
+  return NextResponse.json({ proposals: validProposals });
 }
