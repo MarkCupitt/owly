@@ -48,9 +48,12 @@ export async function POST(
   }
 
   await prisma.$transaction([
-    // Clean up match proposals involving the source customer
+    // Clean up other match proposals involving the source customer (exclude current)
     prisma.customerMatchProposal.deleteMany({
-      where: { OR: [{ customerId: sourceId }, { proposedMatchId: sourceId }] },
+      where: {
+        id: { not: id },
+        OR: [{ customerId: sourceId }, { proposedMatchId: sourceId }],
+      },
     }),
     // Move conversations
     prisma.conversation.updateMany({
