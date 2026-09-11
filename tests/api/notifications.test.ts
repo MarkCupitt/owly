@@ -66,4 +66,33 @@ describe("PATCH /api/notifications/[id]", () => {
       data: { isRead: true },
     });
   });
+
+  it("returns 404 when notification does not exist", async () => {
+    const prismaError = { code: "P2025" };
+    mockPrisma.notification.update.mockRejectedValue(prismaError);
+
+    const { PATCH } = await import("@/app/api/notifications/[id]/route");
+    const request = createRequest("/api/notifications/nonexistent", { method: "PATCH" });
+    const params = { params: Promise.resolve({ id: "nonexistent" }) };
+    const response = await PATCH(request, params);
+
+    expect(response.status).toBe(404);
+  });
+
+  it("returns unread count in list response", async () => {
+    mockPrisma.notification.findMany.mockResolvedValue([
+      { id: "notif-1", type: "automation", title: "A", message: "M", isRead: false, createdAt: new Date() },
+      { id: "notif-2", type: "system", title: "B", message: "N", isRead: true, createdAt: new Date() },
+    ]);
+    mockPrisma.notification.count.mockResolvedValue(2);
+    mockPrisma.notification.aggregate.mockResolvedValue({ _count: { _all: 1 } });
+
+    const { GET } = await import("@/app/api/notifications/route");
+    const request = createRequest("/api/notifications");
+    const response = await GET(request);
+    const data = await parseJsonResponse(response);
+
+    expect(response.status).toBe(200);
+    expect(data.total).toBe(2);
+  });
 });

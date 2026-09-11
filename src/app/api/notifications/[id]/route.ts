@@ -13,10 +13,17 @@ export async function PATCH(
 
   const { id } = await params;
 
-  const notification = await prisma.notification.update({
-    where: { id },
-    data: { isRead: true },
-  });
+  try {
+    const notification = await prisma.notification.update({
+      where: { id },
+      data: { isRead: true },
+    });
 
-  return NextResponse.json(notification);
+    return NextResponse.json(notification);
+  } catch (error: any) {
+    if (error?.code === "P2025") {
+      return NextResponse.json({ error: "Notification not found" }, { status: 404 });
+    }
+    throw error;
+  }
 }

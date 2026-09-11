@@ -70,6 +70,44 @@ describe("GET /api/external/conversations", () => {
 
     expect(response.status).toBe(400);
   });
+
+  it("falls back to email lookup when externalId has no match", async () => {
+    // First findFirst (externalId) returns null, second (email) returns customer
+    mockPrisma.customer.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "cust-1", email: "john@example.com" });
+    mockPrisma.conversation.findMany.mockResolvedValue([
+      { id: "conv-1", channel: "email", status: "active", customerName: "John", summary: null, createdAt: new Date(), updatedAt: new Date(), _count: { messages: 2 } },
+    ]);
+    mockPrisma.conversation.count.mockResolvedValue(1);
+
+    const { GET } = await import("@/app/api/external/conversations/route");
+    const request = createRequest("/api/external/conversations", {
+      searchParams: { externalId: "ext-999", externalSystem: "powerdeck", email: "john@example.com" },
+    });
+    const response = await GET(request);
+    const data = await parseJsonResponse(response);
+
+    expect(response.status).toBe(200);
+    expect(data.conversations).toHaveLength(1);
+    // Should have called findFirst at least twice — once for externalId, once for email fallback
+    expect(mockPrisma.customer.findFirst.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("returns empty when neither externalId nor email matches", async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue(null);
+
+    const { GET } = await import("@/app/api/external/conversations/route");
+    const request = createRequest("/api/external/conversations", {
+      searchParams: { email: "nobody@example.com" },
+    });
+    const response = await GET(request);
+    const data = await parseJsonResponse(response);
+
+    expect(response.status).toBe(200);
+    expect(data.conversations).toHaveLength(0);
+    expect(data.total).toBe(0);
+  });
 });
 
 describe("GET /api/external/conversations/[id]/messages", () => {
