@@ -21,6 +21,10 @@ describe("GET /api/customers/match-proposals", () => {
         createdAt: new Date(),
       },
     ]);
+    mockPrisma.customer.findMany.mockResolvedValue([
+      { id: "cust-1", name: "John", email: "john@test.com", phone: "+123" },
+      { id: "cust-2", name: "John", email: "john2@test.com", phone: "+456" },
+    ]);
 
     const { GET } = await import("@/app/api/customers/match-proposals/route");
     const request = createRequest("/api/customers/match-proposals");
