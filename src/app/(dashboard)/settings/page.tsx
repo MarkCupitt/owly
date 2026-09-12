@@ -929,9 +929,9 @@ function AppearanceSection({
   }
 
   const currentPreset = getPresetById(data.themePreset);
-  const presetColors = currentPreset
+  const presetColors = (currentPreset
     ? (overrideMode === "light" ? currentPreset.colors.light : currentPreset.colors.dark)
-    : {};
+    : {}) as Record<string, string>;
 
   async function handleUpload(file: File, field: "themeLogoUrl" | "themeLogoDarkUrl" | "themeFaviconUrl") {
     setUploading(field);

@@ -139,7 +139,7 @@ if [[ -f "$BRANDING_DIR/powerdeck-icon.png" ]]; then
   ssh coolabah-server "cat > /tmp/pd-theme.sql << 'SQLEOF'
 UPDATE \"Admin\" SET \"themePreset\" = 'owly-default',
   \"themeOverridesLight\" = '{\"--owly-primary\":\"#FF6B00\",\"--owly-primary-dark\":\"#E05A00\",\"--owly-primary-light\":\"#FF9933\",\"--owly-sidebar\":\"#222222\",\"--owly-sidebar-hover\":\"#333333\",\"--owly-sidebar-active\":\"#FF6B00\",\"--owly-text\":\"#222222\",\"--owly-text-light\":\"#555555\",\"--owly-border\":\"#DDDDDD\"}'::jsonb,
-  \"themeOverridesDark\" = '{\"--owly-primary\":\"#FF6B00\",\"--owly-primary-dark\":\"#E05A00\",\"--owly-primary-light\":\"#FF9933\",\"--owly-sidebar\":\"#0F0A05\",\"--owly-sidebar-hover\":\"#1A1410\",\"--owly-sidebar-active\":\"#FF6B00\",\"--owly-border\":\"#332B22\"}'::jsonb
+  \"themeOverridesDark\" = '{\"--owly-primary\":\"#FF6B00\",\"--owly-primary-dark\":\"#E05A00\",\"--owly-primary-light\":\"#FF9933\",\"--owly-sidebar\":\"#0F0A05\",\"--owly-sidebar-hover\":\"#1A1410\",\"--owly-sidebar-active\":\"#FF6B00\",\"--owly-text\":\"#F1F5F9\",\"--owly-text-light\":\"#94A3B8\",\"--owly-border\":\"#332B22\"}'::jsonb
   WHERE username = '${ADMIN_USERNAME}';
 SQLEOF
 docker exec -i owly_postgres psql -U owly owly < /tmp/pd-theme.sql && rm /tmp/pd-theme.sql"
