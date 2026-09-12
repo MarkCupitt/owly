@@ -52,7 +52,7 @@ export async function getCurrentUser() {
 
   const admin = await prisma.admin.findUnique({
     where: { id: payload.userId },
-    select: { id: true, username: true, name: true, role: true },
+    select: { id: true, username: true, name: true, role: true, themePreset: true, themeOverridesLight: true, themeOverridesDark: true, themeMode: true },
   });
 
   return admin;

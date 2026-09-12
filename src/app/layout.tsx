@@ -11,11 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "HelpDesk",
+  title: "PowerDeck",
   description: "AI-powered customer support system",
-  icons: {
-    icon: "/owly.png",
-  },
 };
 
 export default function RootLayout({

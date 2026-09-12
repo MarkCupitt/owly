@@ -180,7 +180,16 @@ export const updateSettingsSchema = z.object({
   themeFaviconUrl: z.string().max(2000).regex(/^$|^https?:\/\/|^\/[^\/]/, "Must be a URL starting with http://, https://, or /").optional(),
   appName: z.string().max(100).optional(),
   appNameShort: z.string().max(50).optional(),
+  systemName: z.string().max(100).optional(),
   autoReplyEnabled: z.boolean().optional(),
+}).strict();
+
+// User Preferences (per-user theme)
+export const updateUserPreferencesSchema = z.object({
+  themePreset: z.string().max(50).optional(),
+  themeOverridesLight: z.record(z.string(), z.string().regex(/^#[0-9a-fA-F]{3,8}$|^rgb\(|^hsl\(/, "Must be a valid color (hex, rgb, or hsl)")).optional(),
+  themeOverridesDark: z.record(z.string(), z.string().regex(/^#[0-9a-fA-F]{3,8}$|^rgb\(|^hsl\(/, "Must be a valid color (hex, rgb, or hsl)")).optional(),
+  themeMode: z.enum(["light", "dark", "system"]).optional(),
 }).strict();
 
 // Canned Responses

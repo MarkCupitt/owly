@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { PROVIDER_CONFIGS } from "@/lib/ai/provider-configs";
 
 const startTime = Date.now();
 
@@ -14,26 +15,33 @@ export async function GET() {
     checks.database = "error";
   }
 
-  // OpenAI reachability check
+  // AI provider reachability check — uses the configured provider
+  const providerKey = "ai";
   try {
     const settings = await prisma.settings.findFirst({
-      select: { aiApiKey: true },
+      select: { aiApiKey: true, aiProvider: true, aiBaseUrl: true },
     });
-    if (settings?.aiApiKey) {
+    const provider = settings?.aiProvider || "openai";
+    const providerCfg = PROVIDER_CONFIGS[provider];
+    const apiKey = settings?.aiApiKey || "";
+
+    if (apiKey || (providerCfg && !providerCfg.apiKeyRequired)) {
+      const baseURL = settings?.aiBaseUrl || providerCfg?.baseURL || "https://api.openai.com/v1";
+      const checkUrl = baseURL.replace(/\/$/, "") + "/models";
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch("https://api.openai.com/v1/models", {
-        method: "HEAD",
-        headers: { Authorization: `Bearer ${settings.aiApiKey}` },
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(checkUrl, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      checks.openai = res.ok ? "reachable" : "error";
+      checks[providerKey] = res.ok ? "reachable" : `error (${res.status})`;
     } else {
-      checks.openai = "not_configured";
+      checks[providerKey] = "not_configured";
     }
   } catch {
-    checks.openai = "unreachable";
+    checks[providerKey] = "unreachable";
   }
 
   // Uptime

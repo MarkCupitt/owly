@@ -7,6 +7,7 @@ interface ThemeAppearanceStore {
   themePreset: string;
   themeOverridesLight: Record<string, string>;
   themeOverridesDark: Record<string, string>;
+  themeMode: "light" | "dark" | "system";
   themeLogoUrl: string;
   themeLogoDarkUrl: string;
   themeFaviconUrl: string;
@@ -24,6 +25,7 @@ export const useThemeAppearance = create<ThemeAppearanceStore>()(
       themePreset: "owly-default",
       themeOverridesLight: {},
       themeOverridesDark: {},
+      themeMode: "system",
       themeLogoUrl: "",
       themeLogoDarkUrl: "",
       themeFaviconUrl: "",

@@ -61,6 +61,7 @@ interface SettingsData {
   themePreset: string;
   themeOverridesLight: Record<string, string>;
   themeOverridesDark: Record<string, string>;
+  themeMode: "light" | "dark" | "system";
   themeLogoUrl: string;
   themeLogoDarkUrl: string;
   themeFaviconUrl: string;
@@ -133,8 +134,16 @@ const sectionFields: Record<SectionKey, (keyof SettingsData)[]> = {
   ],
   whatsapp: ["whatsappMode", "whatsappApiKey", "whatsappPhone"],
   channels: [],
-  appearance: ["themePreset", "themeOverridesLight", "themeOverridesDark", "themeLogoUrl", "themeLogoDarkUrl", "themeFaviconUrl"],
+  appearance: ["themeLogoUrl", "themeLogoDarkUrl", "themeFaviconUrl"],
 };
+
+// Fields saved to per-user preferences (not global settings)
+const userPrefFields: (keyof SettingsData)[] = [
+  "themePreset",
+  "themeOverridesLight",
+  "themeOverridesDark",
+  "themeMode",
+];
 
 // ---------------------------------------------------------------------------
 // Toast component
@@ -872,6 +881,11 @@ function AppearanceSection({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [overrideMode, setOverrideMode] = useState<"light" | "dark">("light");
   const [uploading, setUploading] = useState<string | null>(null);
+  const [overridesEnabled, setOverridesEnabled] = useState(true);
+
+  const hasOverrides =
+    Object.keys(data.themeOverridesLight || {}).length > 0 ||
+    Object.keys(data.themeOverridesDark || {}).length > 0;
 
   const colorVarNames = [
     "--owly-primary", "--owly-primary-dark", "--owly-primary-light",
@@ -882,11 +896,29 @@ function AppearanceSection({
     "--owly-success", "--owly-warning", "--owly-danger",
   ];
 
-  function applyAppearance(presetId?: string, overridesLight?: Record<string, string>, overridesDark?: Record<string, string>) {
+  function applyAppearance(presetId?: string, overridesLight?: Record<string, string>, overridesDark?: Record<string, string>, mode?: "light" | "dark" | "system") {
     setAppearance({
       themePreset: presetId ?? data.themePreset,
-      themeOverridesLight: overridesLight ?? data.themeOverridesLight,
-      themeOverridesDark: overridesDark ?? data.themeOverridesDark,
+      themeOverridesLight: overridesLight ?? (overridesEnabled ? data.themeOverridesLight : {}),
+      themeOverridesDark: overridesDark ?? (overridesEnabled ? data.themeOverridesDark : {}),
+      themeMode: mode ?? data.themeMode,
+      themeLogoUrl: data.themeLogoUrl,
+      themeLogoDarkUrl: data.themeLogoDarkUrl,
+      themeFaviconUrl: data.themeFaviconUrl,
+      appName: data.appName,
+      appNameShort: data.appNameShort,
+      systemName: data.systemName,
+    });
+  }
+
+  function toggleOverrides() {
+    const newEnabled = !overridesEnabled;
+    setOverridesEnabled(newEnabled);
+    setAppearance({
+      themePreset: data.themePreset,
+      themeOverridesLight: newEnabled ? data.themeOverridesLight : {},
+      themeOverridesDark: newEnabled ? data.themeOverridesDark : {},
+      themeMode: data.themeMode,
       themeLogoUrl: data.themeLogoUrl,
       themeLogoDarkUrl: data.themeLogoDarkUrl,
       themeFaviconUrl: data.themeFaviconUrl,
@@ -918,7 +950,9 @@ function AppearanceSection({
     }
   }
 
-  const activeOverrides = overrideMode === "light" ? data.themeOverridesLight : data.themeOverridesDark;
+  const activeOverrides = overridesEnabled
+    ? (overrideMode === "light" ? data.themeOverridesLight : data.themeOverridesDark)
+    : {};
 
   function setOverrideVar(varName: string, value: string) {
     const field = overrideMode === "light" ? "themeOverridesLight" : "themeOverridesDark";
@@ -945,7 +979,7 @@ function AppearanceSection({
 
   return (
     <div className="space-y-5">
-      <FormField label="Theme Preset" description="Choose a color theme for your instance.">
+      <FormField label="Theme Preset" description="Choose a color theme. This is your personal preference — each user can pick their own.">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
           {THEME_PRESETS.map((preset) => (
             <button
@@ -983,11 +1017,41 @@ function AppearanceSection({
         </div>
       </FormField>
 
-      <FormField label="Branding" description="Upload your logo and favicon, or enter a URL. Uploaded files are stored at /uploads/.">
+      <FormField label="Appearance Mode" description="Choose light, dark, or follow your system preference. This is your personal preference.">
+        <div className="flex gap-2 mt-2">
+          {(["system", "light", "dark"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => {
+                update("themeMode", mode);
+                applyAppearance(undefined, undefined, undefined, mode);
+              }}
+              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all capitalize ${
+                data.themeMode === mode
+                  ? "border-owly-primary ring-1 ring-owly-primary bg-owly-primary-50 text-owly-primary"
+                  : "border-owly-border hover:border-owly-primary-light text-owly-text-light"
+              }`}
+            >
+              {mode === "system" ? "System" : mode === "light" ? "Light" : "Dark"}
+            </button>
+          ))}
+        </div>
+      </FormField>
+
+      <FormField label="Branding" description="Upload your logo and favicon, or enter a URL. Uploaded files are stored at /uploads/. These are global and apply to all users.">
         <div className="space-y-3 mt-2">
           <div>
             <label className="block text-xs font-medium text-owly-text-light mb-1">Logo (light mode)</label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <div className="w-10 h-10 rounded-lg border border-owly-border bg-owly-bg flex items-center justify-center overflow-hidden shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={data.themeLogoUrl || "/owly.png"}
+                  alt="Logo preview"
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
               <TextInput
                 value={data.themeLogoUrl}
                 onChange={(v) => update("themeLogoUrl", v)}
@@ -1011,7 +1075,15 @@ function AppearanceSection({
           <div>
             <label className="block text-xs font-medium text-owly-text-light mb-1">Logo (dark mode, optional)</label>
             <p className="text-xs text-owly-text-light mb-1">If empty, the light mode logo is used in dark mode as well.</p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <div className="w-10 h-10 rounded-lg border border-owly-border bg-owly-bg flex items-center justify-center overflow-hidden shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={data.themeLogoDarkUrl || data.themeLogoUrl || "/owly.png"}
+                  alt="Dark logo preview"
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
               <TextInput
                 value={data.themeLogoDarkUrl}
                 onChange={(v) => update("themeLogoDarkUrl", v)}
@@ -1034,7 +1106,15 @@ function AppearanceSection({
           </div>
           <div>
             <label className="block text-xs font-medium text-owly-text-light mb-1">Favicon</label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <div className="w-10 h-10 rounded-lg border border-owly-border bg-owly-bg flex items-center justify-center overflow-hidden shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={data.themeFaviconUrl || "/owly.png"}
+                  alt="Favicon preview"
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
               <TextInput
                 value={data.themeFaviconUrl}
                 onChange={(v) => update("themeFaviconUrl", v)}
@@ -1057,6 +1137,86 @@ function AppearanceSection({
           </div>
         </div>
       </FormField>
+
+      {hasOverrides && (
+        <div
+          className={`rounded-lg border p-4 cursor-pointer transition-all ${
+            overridesEnabled
+              ? "border-owly-primary ring-1 ring-owly-primary bg-owly-primary-50"
+              : "border-owly-border hover:border-owly-primary-light bg-owly-bg"
+          }`}
+          onClick={toggleOverrides}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Palette className="w-4 h-4 text-owly-primary" />
+              <span className="text-sm font-medium text-owly-text">Custom Theme Override</span>
+              {overridesEnabled && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-owly-primary text-white">Active</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); toggleOverrides(); }}
+              className={cn(
+                "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
+                overridesEnabled ? "bg-owly-primary" : "bg-owly-border"
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform",
+                  overridesEnabled ? "translate-x-5" : "translate-x-1"
+                )}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-10 h-10 rounded-lg border border-owly-border bg-owly-bg flex items-center justify-center overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={data.themeLogoUrl || "/owly.png"}
+                  alt="Logo"
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+              <span className="text-xs text-owly-text-light">Logo</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-10 h-10 rounded-lg border border-owly-border bg-owly-bg flex items-center justify-center overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={data.themeFaviconUrl || "/owly.png"}
+                  alt="Favicon"
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+              <span className="text-xs text-owly-text-light">Favicon</span>
+            </div>
+            <div className="flex-1 flex flex-wrap gap-1.5">
+              {Object.entries({ ...(overridesEnabled ? data.themeOverridesLight : {} ), ...(overridesEnabled ? data.themeOverridesDark : {}) }).slice(0, 12).map(([key, value]) => (
+                <div key={key} className="flex flex-col items-center gap-0.5">
+                  <span
+                    className="w-6 h-6 rounded border border-owly-border"
+                    style={{ backgroundColor: value }}
+                  />
+                </div>
+              ))}
+              {Object.keys({ ...(overridesEnabled ? data.themeOverridesLight : {}), ...(overridesEnabled ? data.themeOverridesDark : {}) }).length > 12 && (
+                <span className="text-xs text-owly-text-light self-center">+more</span>
+              )}
+            </div>
+          </div>
+
+          <p className="text-xs text-owly-text-light mt-3">
+            {overridesEnabled
+              ? "Custom overrides are applied. Click to disable and use preset defaults."
+              : "Custom overrides are saved but not applied. Click to enable them."}
+          </p>
+        </div>
+      )}
 
       <div>
         <button
@@ -1277,6 +1437,7 @@ const defaultSettings: SettingsData = {
   themePreset: "owly-default",
   themeOverridesLight: {},
   themeOverridesDark: {},
+  themeMode: "system",
   themeLogoUrl: "",
   themeLogoDarkUrl: "",
   themeFaviconUrl: "",
@@ -1302,6 +1463,7 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
+    // Fetch global settings
     fetch("/api/settings")
       .then((r) => r.json())
       .then((settings) => {
@@ -1311,33 +1473,53 @@ export default function SettingsPage() {
             (merged as Record<string, unknown>)[key] = settings[key];
           }
         }
-        setData(merged);
 
-        if (settings.themePreset) {
-          const { setAppearance } = useThemeAppearance.getState();
-          const rawLight = settings.themeOverridesLight;
-          const rawDark = settings.themeOverridesDark;
-          const safeLight = (typeof rawLight === "object" && rawLight !== null && !Array.isArray(rawLight))
-            ? rawLight as Record<string, string>
-            : {};
-          const safeDark = (typeof rawDark === "object" && rawDark !== null && !Array.isArray(rawDark))
-            ? rawDark as Record<string, string>
-            : {};
-          setAppearance({
-            themePreset: settings.themePreset,
-            themeOverridesLight: safeLight,
-            themeOverridesDark: safeDark,
-            themeLogoUrl: settings.themeLogoUrl || "",
-            themeLogoDarkUrl: settings.themeLogoDarkUrl || "",
-            themeFaviconUrl: settings.themeFaviconUrl || "",
-            appName: settings.appName || "HelpDesk",
-            appNameShort: settings.appNameShort || "HelpDesk",
-            systemName: settings.systemName || "HelpDesk",
-          });
-        }
+        // Fetch per-user preferences (theme is per-user, not global)
+        fetch("/api/user/preferences")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((prefs) => {
+            if (prefs) {
+              if (prefs.themePreset) merged.themePreset = prefs.themePreset;
+              if (prefs.themeOverridesLight) {
+                const raw = prefs.themeOverridesLight;
+                merged.themeOverridesLight = (typeof raw === "object" && raw !== null && !Array.isArray(raw))
+                  ? raw as Record<string, string> : {};
+              }
+              if (prefs.themeOverridesDark) {
+                const raw = prefs.themeOverridesDark;
+                merged.themeOverridesDark = (typeof raw === "object" && raw !== null && !Array.isArray(raw))
+                  ? raw as Record<string, string> : {};
+              }
+              if (prefs.themeMode) merged.themeMode = prefs.themeMode;
+            }
+
+            setData(merged);
+
+            const { setAppearance } = useThemeAppearance.getState();
+            const safeLight = (typeof merged.themeOverridesLight === "object" && merged.themeOverridesLight !== null)
+              ? merged.themeOverridesLight : {};
+            const safeDark = (typeof merged.themeOverridesDark === "object" && merged.themeOverridesDark !== null)
+              ? merged.themeOverridesDark : {};
+            setAppearance({
+              themePreset: merged.themePreset,
+              themeOverridesLight: safeLight,
+              themeOverridesDark: safeDark,
+              themeMode: merged.themeMode,
+              themeLogoUrl: merged.themeLogoUrl || "",
+              themeLogoDarkUrl: merged.themeLogoDarkUrl || "",
+              themeFaviconUrl: merged.themeFaviconUrl || "",
+              appName: merged.appName || "HelpDesk",
+              appNameShort: merged.appNameShort || "HelpDesk",
+              systemName: merged.systemName || "HelpDesk",
+            });
+          })
+          .catch(() => {
+            setData(merged);
+          })
+          .finally(() => setLoading(false));
       })
       .catch(() => addToast("error", "Failed to load settings"))
-      .finally(() => setLoading(false));
+      .finally(() => {});
   }, [addToast]);
 
   const update = (field: keyof SettingsData, value: string | number | boolean | Record<string, string>) => {
@@ -1353,13 +1535,37 @@ export default function SettingsPage() {
         payload[f] = data[f];
       }
 
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      // For appearance tab, save branding to global settings
+      if (activeTab === "appearance" && Object.keys(payload).length > 0) {
+        const res = await fetch("/api/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("Save failed");
+      } else if (fields.length > 0) {
+        const res = await fetch("/api/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("Save failed");
+      }
 
-      if (!res.ok) throw new Error("Save failed");
+      // For appearance tab, also save per-user theme preferences
+      if (activeTab === "appearance") {
+        const userPayload: Record<string, unknown> = {};
+        for (const f of userPrefFields) {
+          userPayload[f] = data[f];
+        }
+        const res = await fetch("/api/user/preferences", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(userPayload),
+        });
+        if (!res.ok) throw new Error("Save failed");
+      }
+
       addToast("success", "Settings saved successfully");
 
       if (activeTab === "appearance") {
@@ -1368,17 +1574,20 @@ export default function SettingsPage() {
           themePreset: data.themePreset,
           themeOverridesLight: data.themeOverridesLight,
           themeOverridesDark: data.themeOverridesDark,
+          themeMode: data.themeMode,
           themeLogoUrl: data.themeLogoUrl,
           themeLogoDarkUrl: data.themeLogoDarkUrl,
           themeFaviconUrl: data.themeFaviconUrl,
           appName: data.appName,
           appNameShort: data.appNameShort,
+          systemName: data.systemName,
         });
       } else if (activeTab === "general") {
         const { setAppearance } = useThemeAppearance.getState();
         setAppearance({
           appName: data.appName,
           appNameShort: data.appNameShort,
+          systemName: data.systemName,
         });
       }
     } catch {
@@ -1462,7 +1671,7 @@ export default function SettingsPage() {
                 {activeTab === "channels" &&
                   "Manage custom webhook channels (inbound webhooks, integrations). Channels auto-create on first message."}
                 {activeTab === "appearance" &&
-                  "Customize the look and feel of your instance."}
+                  "Customize branding (global) and theme (per-user). Each user can pick their own theme preset and colors."}
               </p>
             </div>
 

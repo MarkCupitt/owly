@@ -1,38 +1,122 @@
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/owly?schema=public";
+const connectionString =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:postgres@localhost:5432/owly?schema=public";
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
+function env(key: string, fallback: string): string {
+  const val = process.env[key];
+  return val !== undefined && val.length > 0 ? val : fallback;
+}
+
+function generateApiKey(): string {
+  return "owly_" + crypto.randomBytes(32).toString("hex");
+}
+
 async function main() {
-  // Create default admin (password: admin123)
-  const hashedPassword = await bcrypt.hash("admin123", 12);
+  const adminUsername = env("SEED_ADMIN_USERNAME", "markcupitt");
+  const adminPassword = env("SEED_ADMIN_PASSWORD", "password1");
+  const adminName = env("SEED_ADMIN_NAME", "Mark Cupitt");
+
+  const businessName = env("SEED_BUSINESS_NAME", "Powerdeck Solutions");
+  const businessDesc = env(
+    "SEED_BUSINESS_DESC",
+    "INTELLIGENT ENERGY MANAGEMENT — The home and business energy management and control platform for solar, inverters, and smart devices."
+  );
+  const appName = env("SEED_APP_NAME", "PowerDeck HelpDesk");
+  const appNameShort = env("SEED_APP_NAME_SHORT", "PowerDeck");
+  const systemName = env("SEED_SYSTEM_NAME", "HelpDesk");
+  const welcomeMessage = env(
+    "SEED_WELCOME_MESSAGE",
+    "Hi There, Welcome to PowerDeck, How can I help you solve your energy management problems?"
+  );
+  const tone = env("SEED_TONE", "friendly");
+
+  const themePreset = env("SEED_THEME_PRESET", "owly-default");
+  const aiProvider = env("SEED_AI_PROVIDER", "gemini");
+  const aiModel = env("SEED_AI_MODEL", "gemini-2.5-flash");
+  const aiApiKey = env("SEED_AI_API_KEY", "");
+  const aiBaseUrl = env("SEED_AI_BASE_URL", "");
+
+  const apiKeyName = env("SEED_API_KEY_NAME", "PowerDeck Upstream Integration");
+  const upstreamSystemLabel = env(
+    "SEED_UPSTREAM_SYSTEM_LABEL",
+    "PowerDeck Client Portal"
+  );
+  const upstreamIdentityEnabled =
+    env("SEED_UPSTREAM_IDENTITY_ENABLED", "true") === "true";
+
+  // ── Admin user ──
+  const hashedPassword = await bcrypt.hash(adminPassword, 12);
   await prisma.admin.upsert({
-    where: { username: "admin" },
-    update: {},
+    where: { username: adminUsername },
+    update: { password: hashedPassword, name: adminName, role: "admin" },
     create: {
-      username: "admin",
+      username: adminUsername,
       password: hashedPassword,
-      name: "Administrator",
+      name: adminName,
       role: "admin",
     },
   });
 
-  // Create default settings
+  // ── Settings ──
   await prisma.settings.upsert({
     where: { id: "default" },
-    update: {},
+    update: {
+      businessName,
+      businessDesc,
+      appName,
+      appNameShort,
+      systemName,
+      welcomeMessage,
+      tone,
+      themePreset,
+      aiProvider,
+      aiModel,
+      ...(aiApiKey ? { aiApiKey } : {}),
+      ...(aiBaseUrl ? { aiBaseUrl } : {}),
+      upstreamIdentityEnabled,
+      upstreamIdentitySystemLabel: upstreamSystemLabel,
+    },
     create: {
       id: "default",
-      businessName: "My Business",
-      businessDesc: "We provide excellent products and services.",
-      welcomeMessage: "Hello! Welcome to our support. How can I help you today?",
-      tone: "friendly",
+      businessName,
+      businessDesc,
+      appName,
+      appNameShort,
+      systemName,
+      welcomeMessage,
+      tone,
+      themePreset,
       language: "auto",
+      aiProvider,
+      aiModel,
+      aiApiKey,
+      aiBaseUrl,
+      upstreamIdentityEnabled,
+      upstreamIdentitySystemLabel: upstreamSystemLabel,
     },
   });
+
+  // ── API Key ──
+  const existingKey = await prisma.apiKey.findFirst({
+    where: { name: apiKeyName },
+  });
+  let fullApiKey: string;
+  if (existingKey) {
+    fullApiKey = existingKey.key;
+    console.log(`  ℹ API key "${apiKeyName}" already exists (keeping)`);
+  } else {
+    fullApiKey = generateApiKey();
+    await prisma.apiKey.create({
+      data: { name: apiKeyName, key: fullApiKey, isActive: true },
+    });
+  }
 
   // Create default channels
   for (const type of ["whatsapp", "email", "phone"]) {
@@ -58,7 +142,7 @@ async function main() {
       id: "dept-tech",
       name: "Technical Support",
       description: "Handles technical issues, bugs, and product troubleshooting",
-      email: "tech@example.com",
+      email: "tech@powerdeck.work",
     },
   });
 
@@ -69,7 +153,7 @@ async function main() {
       id: "dept-sales",
       name: "Sales",
       description: "Handles pricing, quotes, and purchase inquiries",
-      email: "sales@example.com",
+      email: "sales@powerdeck.work",
     },
   });
 
@@ -80,16 +164,16 @@ async function main() {
       id: "dept-billing",
       name: "Billing",
       description: "Handles invoices, payments, and refunds",
-      email: "billing@example.com",
+      email: "billing@powerdeck.work",
     },
   });
 
   // Create sample team members
   const members = [
-    { id: "member-1", name: "John Smith", email: "john@example.com", role: "Lead", expertise: "software, debugging, API issues", departmentId: techDept.id },
-    { id: "member-2", name: "Sarah Johnson", email: "sarah@example.com", role: "Member", expertise: "networking, infrastructure, deployment", departmentId: techDept.id },
-    { id: "member-3", name: "Mike Davis", email: "mike@example.com", role: "Lead", expertise: "pricing, enterprise deals, partnerships", departmentId: salesDept.id },
-    { id: "member-4", name: "Emily Brown", email: "emily@example.com", role: "Lead", expertise: "invoices, refunds, payment processing", departmentId: billingDept.id },
+    { id: "member-1", name: "John Smith", email: "john@powerdeck.work", role: "Lead", expertise: "solar, inverters, energy management", departmentId: techDept.id },
+    { id: "member-2", name: "Sarah Johnson", email: "sarah@powerdeck.work", role: "Member", expertise: "networking, infrastructure, deployment", departmentId: techDept.id },
+    { id: "member-3", name: "Mike Davis", email: "mike@powerdeck.work", role: "Lead", expertise: "pricing, enterprise deals, partnerships", departmentId: salesDept.id },
+    { id: "member-4", name: "Emily Brown", email: "emily@powerdeck.work", role: "Lead", expertise: "invoices, refunds, payment processing", departmentId: billingDept.id },
   ];
 
   for (const m of members) {
@@ -113,10 +197,10 @@ async function main() {
 
   const entries = [
     { id: "entry-1", categoryId: "cat-faq", title: "Business Hours", content: "We are open Monday to Friday, 9:00 AM to 6:00 PM. Our AI assistant is available 24/7 for basic inquiries.", priority: 10 },
-    { id: "entry-2", categoryId: "cat-faq", title: "Contact Information", content: "You can reach us via email at support@example.com, phone at +1-555-0123, or WhatsApp. Our AI assistant is always here to help!", priority: 9 },
-    { id: "entry-3", categoryId: "cat-products", title: "Product Overview", content: "We offer a range of products designed to help businesses streamline their operations. Contact our sales team for detailed pricing and custom solutions.", priority: 5 },
-    { id: "entry-4", categoryId: "cat-policies", title: "Return Policy", content: "We offer a 30-day return policy for all unused products in their original packaging. To initiate a return, please contact our support team with your order number.", priority: 8 },
-    { id: "entry-5", categoryId: "cat-policies", title: "Refund Policy", content: "Refunds are processed within 5-10 business days after we receive the returned item. The refund will be credited to the original payment method.", priority: 7 },
+    { id: "entry-2", categoryId: "cat-faq", title: "Contact Information", content: "You can reach us via email at support@powerdeck.work, or through the PowerDeck platform. Our AI assistant is always here to help!", priority: 9 },
+    { id: "entry-3", categoryId: "cat-products", title: "Platform Overview", content: "PowerDeck is an intelligent energy management platform for solar, inverters, and smart devices. Contact our sales team for detailed pricing and custom solutions.", priority: 5 },
+    { id: "entry-4", categoryId: "cat-policies", title: "Support Policy", content: "We provide full support for all PowerDeck installations. To initiate a support request, please contact our team through the helpdesk.", priority: 8 },
+    { id: "entry-5", categoryId: "cat-policies", title: "Refund Policy", content: "Refunds are processed within 5-10 business days after we receive the request. The refund will be credited to the original payment method.", priority: 7 },
   ];
 
   for (const e of entries) {
@@ -138,10 +222,10 @@ async function main() {
 
   // Create sample canned responses
   const cannedResponses = [
-    { id: "cr-1", title: "Greeting", content: "Hello! Thank you for reaching out. How can I help you today?", category: "General", shortcut: "/greeting" },
-    { id: "cr-2", title: "Closing", content: "Thank you for contacting us! Is there anything else I can help you with?", category: "General", shortcut: "/closing" },
-    { id: "cr-3", title: "Refund Process", content: "I understand you'd like a refund. Let me look into this for you. Could you please provide your order number?", category: "Billing", shortcut: "/refund" },
-    { id: "cr-4", title: "Escalation", content: "I'll connect you with a specialist who can better assist you with this matter. Please hold on.", category: "Support", shortcut: "/escalate" },
+    { id: "cr-1", title: "Greeting", content: "Hello! Thank you for reaching out to PowerDeck. How can I help you today?", category: "General", shortcut: "/greeting" },
+    { id: "cr-2", title: "Closing", content: "Thank you for contacting PowerDeck! Is there anything else I can help you with?", category: "General", shortcut: "/closing" },
+    { id: "cr-3", title: "Escalation", content: "I'll connect you with a specialist who can better assist you with this matter. Please hold on.", category: "Support", shortcut: "/escalate" },
+    { id: "cr-4", title: "Energy Inquiry", content: "I can help with your energy management questions. Could you provide more details about your solar or inverter setup?", category: "Support", shortcut: "/energy" },
   ];
 
   for (const cr of cannedResponses) {
@@ -158,8 +242,16 @@ async function main() {
     await prisma.sLARule.upsert({ where: { id: sla.id }, update: {}, create: sla });
   }
 
-  console.log("Seed data created successfully!");
-  console.log("Default admin: username=admin, password=admin123");
+  console.log("\n━━━ Seed Complete ━━━");
+  console.log(`  Admin:    ${adminUsername} / ${adminPassword}`);
+  console.log(`  Business: ${businessName}`);
+  console.log(`  App:      ${appName} (${appNameShort})`);
+  console.log(`  System:   ${systemName}`);
+  console.log(`  Theme:    ${themePreset}`);
+  console.log(`  AI:       ${aiProvider} / ${aiModel}`);
+  console.log(`  API Key:  ${fullApiKey}`);
+  console.log(`  Upstream: ${upstreamSystemLabel} (enabled: ${upstreamIdentityEnabled})`);
+  console.log("━━━━━━━━━━━━━━━━━━━━━\n");
 }
 
 main()
