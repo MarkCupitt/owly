@@ -82,7 +82,7 @@ if [[ "$DO_RESET" == "true" ]]; then
 
   # Run migrations inside the owly container
   log "Running Prisma migrations..."
-  ssh coolabah-server 'docker exec -e HOME=/tmp -w /app owly node node_modules/prisma/build/index.js migrate deploy 2>&1'
+  ssh coolabah-server 'docker exec -e HOME=/tmp -w /app owly ./node_modules/.bin/prisma migrate deploy 2>&1'
   ok "Migrations applied"
 else
   warn "Skipping database reset (--no-reset)"
@@ -109,7 +109,7 @@ SEED_ENV+=" -e SEED_API_KEY_NAME='${SEED_API_KEY_NAME:-PowerDeck Upstream Integr
 SEED_ENV+=" -e SEED_UPSTREAM_SYSTEM_LABEL='${SEED_UPSTREAM_SYSTEM_LABEL:-PowerDeck Client Portal}'"
 SEED_ENV+=" -e SEED_UPSTREAM_IDENTITY_ENABLED='${SEED_UPSTREAM_IDENTITY_ENABLED:-true}'"
 
-ssh coolabah-server "docker exec ${SEED_ENV} -w /app owly node --import tsx prisma/seed.ts 2>&1"
+ssh coolabah-server "docker exec ${SEED_ENV} -w /app owly npx tsx prisma/seed.ts 2>&1"
 
 ok "Seed complete"
 
@@ -120,17 +120,18 @@ BRANDING_DIR="/home/mark/repos/coolabah/powerdeck/branding"
 
 if [[ -f "$BRANDING_DIR/powerdeck-icon.png" ]]; then
   # Uploads are bind-mounted from host dir, so copy directly to the host path
-  UPLOADS_DIR="~/powerdeck/docker/owly/uploads"
-  ssh coolabah-server "mkdir -p $UPLOADS_DIR" 2>/dev/null
+  # Directory is owned by container UID 1001, so use sudo to write
+  UPLOADS_DIR="/home/mark/powerdeck/docker/owly/uploads"
+  ssh coolabah-server "sudo mkdir -p $UPLOADS_DIR"
 
   # Copy logo and favicon (both use powerdeck-icon.png = _master_square.png)
-  scp "$BRANDING_DIR/powerdeck-icon.png" coolabah-server:$UPLOADS_DIR/powerdeck-logo.png 2>/dev/null
-  scp "$BRANDING_DIR/powerdeck-icon.png" coolabah-server:$UPLOADS_DIR/powerdeck-favicon.png 2>/dev/null
-  ssh coolabah-server "sudo chown 1001:65534 $UPLOADS_DIR/powerdeck-*.png 2>/dev/null; ls -la $UPLOADS_DIR/powerdeck-*.png" 2>/dev/null
+  scp "$BRANDING_DIR/powerdeck-icon.png" coolabah-server:/tmp/pd-logo.png
+  scp "$BRANDING_DIR/powerdeck-icon.png" coolabah-server:/tmp/pd-favicon.png
+  ssh coolabah-server "sudo cp /tmp/pd-logo.png $UPLOADS_DIR/powerdeck-logo.png && sudo cp /tmp/pd-favicon.png $UPLOADS_DIR/powerdeck-favicon.png && sudo chown 1001:65534 $UPLOADS_DIR/powerdeck-*.png && rm /tmp/pd-logo.png /tmp/pd-favicon.png && ls -la $UPLOADS_DIR/powerdeck-*.png"
   ok "Logo + Favicon uploaded → /uploads/powerdeck-logo.png, /uploads/powerdeck-favicon.png"
 
   # Update global settings to use the uploaded assets (branding is global)
-  ssh coolabah-server "docker exec owly_postgres psql -U owly owly -c \"UPDATE \\\"Settings\\\" SET \\\"themeLogoUrl\\\" = '/uploads/powerdeck-logo.png', \\\"themeFaviconUrl\\\" = '/uploads/powerdeck-favicon.png' WHERE id = 'default';\"" 2>/dev/null
+  ssh coolabah-server "docker exec owly_postgres psql -U owly owly -c \"UPDATE \\\"Settings\\\" SET \\\"themeLogoUrl\\\" = '/uploads/powerdeck-logo.png', \\\"themeFaviconUrl\\\" = '/uploads/powerdeck-favicon.png' WHERE id = 'default';\""
   ok "Global settings updated with PowerDeck branding"
 
   # Set admin user's per-user theme overrides to PowerDeck brand colors
@@ -141,7 +142,7 @@ UPDATE \"Admin\" SET \"themePreset\" = 'owly-default',
   \"themeOverridesDark\" = '{\"--owly-primary\":\"#FF6B00\",\"--owly-primary-dark\":\"#E05A00\",\"--owly-primary-light\":\"#FF9933\",\"--owly-sidebar\":\"#0F0A05\",\"--owly-sidebar-hover\":\"#1A1410\",\"--owly-sidebar-active\":\"#FF6B00\",\"--owly-border\":\"#332B22\"}'::jsonb
   WHERE username = '${ADMIN_USERNAME}';
 SQLEOF
-docker exec -i owly_postgres psql -U owly owly < /tmp/pd-theme.sql && rm /tmp/pd-theme.sql" 2>&1
+docker exec -i owly_postgres psql -U owly owly < /tmp/pd-theme.sql && rm /tmp/pd-theme.sql"
   ok "Admin user theme set to PowerDeck brand colors"
 else
   warn "Branding assets not found at $BRANDING_DIR — skipping"
