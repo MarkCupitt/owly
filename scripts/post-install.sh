@@ -151,11 +151,26 @@ fi
 # ── Step 3: Restart the app to pick up fresh state ──
 log "Restarting Owly container..."
 ssh coolabah-server 'docker restart owly' 2>&1 | tail -1
-sleep 3
 
-# ── Step 4: Health check ──
+# ── Step 4: Health check (with retries) ──
 log "Health check..."
-HEALTH=$(ssh coolabah-server 'curl -s http://127.0.0.1:3001/api/health' 2>/dev/null)
+MAX_RETRIES=15
+RETRY=0
+HEALTH=""
+while [[ $RETRY -lt $MAX_RETRIES ]]; do
+  RETRY=$((RETRY + 1))
+  HEALTH=$(ssh coolabah-server 'curl -sf http://127.0.0.1:3001/api/health' 2>/dev/null) || HEALTH=""
+  if [[ -n "$HEALTH" ]]; then
+    break
+  fi
+  log "Waiting for container to be ready... (attempt $RETRY/$MAX_RETRIES)"
+  sleep 3
+done
+
+if [[ -z "$HEALTH" ]]; then
+  err "Health check failed after $MAX_RETRIES attempts"
+  exit 1
+fi
 echo "  $HEALTH"
 
 echo ""
