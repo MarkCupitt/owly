@@ -987,9 +987,7 @@ function AppearanceSection({
               type="button"
               onClick={() => {
                 update("themePreset", preset.id);
-                update("themeOverridesLight", {});
-                update("themeOverridesDark", {});
-                applyAppearance(preset.id, {}, {});
+                applyAppearance(preset.id);
               }}
               className={`rounded-lg border p-3 text-left transition-all ${
                 data.themePreset === preset.id
@@ -1014,6 +1012,37 @@ function AppearanceSection({
               <div className="text-sm font-medium text-owly-text">{preset.name}</div>
             </button>
           ))}
+          {hasOverrides && (
+            <button
+              key="custom"
+              type="button"
+              onClick={() => {
+                applyAppearance(data.themePreset, data.themeOverridesLight, data.themeOverridesDark);
+              }}
+              className={`rounded-lg border p-3 text-left transition-all ${
+                overridesEnabled
+                  ? "border-owly-primary ring-1 ring-owly-primary bg-owly-primary-50"
+                  : "border-owly-border hover:border-owly-primary-light"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className="w-5 h-5 rounded-full border border-owly-border"
+                  style={{ backgroundColor: data.themeOverridesLight["--owly-primary"] || presetColors?.["--owly-primary"] || "#4A7C9B" }}
+                />
+                <span
+                  className="w-5 h-5 rounded-full border border-owly-border"
+                  style={{ backgroundColor: data.themeOverridesLight["--owly-accent"] || presetColors?.["--owly-accent"] || "#C4956A" }}
+                />
+                <span
+                  className="w-5 h-5 rounded-full border border-owly-border"
+                  style={{ backgroundColor: data.themeOverridesLight["--owly-sidebar"] || presetColors?.["--owly-sidebar"] || "#1E293B" }}
+                />
+              </div>
+              <div className="text-sm font-medium text-owly-text">Custom Override</div>
+              <div className="text-xs text-owly-text-light">{Object.keys(data.themeOverridesLight || {}).length + Object.keys(data.themeOverridesDark || {}).length} colors overridden</div>
+            </button>
+          )}
         </div>
       </FormField>
 

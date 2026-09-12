@@ -28,6 +28,9 @@ function addHeaders(
     response.headers.set(key, value);
   }
 
+  // Prevent browser from caching HTML/JSON responses (static assets are handled by Next.js with hashed filenames)
+  response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+
   // Request ID
   response.headers.set("X-Request-Id", requestId);
 
