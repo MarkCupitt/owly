@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const externalSystem = searchParams.get("externalSystem");
   const email = searchParams.get("email");
   const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "20");
+  const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100);
 
   if (!externalId && !email) {
     return NextResponse.json(

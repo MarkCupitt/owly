@@ -11,30 +11,20 @@ export async function GET(request: NextRequest) {
   const proposals = await prisma.customerMatchProposal.findMany({
     where: { status: "pending" },
     orderBy: { createdAt: "desc" },
+    include: {
+      customer: { select: { id: true, name: true, email: true, phone: true } },
+      proposedMatch: { select: { id: true, name: true, email: true, phone: true } },
+    },
   });
 
-  const enrichedProposals = await Promise.all(
-    proposals.map(async (p) => {
-      const customer = await prisma.customer.findUnique({
-        where: { id: p.customerId },
-        select: { id: true, name: true, email: true, phone: true },
-      });
-      const proposedMatch = await prisma.customer.findUnique({
-        where: { id: p.proposedMatchId },
-        select: { id: true, name: true, email: true, phone: true },
-      });
-      return { ...p, customer, proposedMatch };
-    })
-  );
-
   // Filter out stale proposals where either customer was deleted
-  const validProposals = enrichedProposals.filter(
+  const validProposals = proposals.filter(
     (p) => p.customer !== null && p.proposedMatch !== null
   );
 
   // Clean up stale proposals in the background
-  if (validProposals.length < enrichedProposals.length) {
-    const staleIds = enrichedProposals
+  if (validProposals.length < proposals.length) {
+    const staleIds = proposals
       .filter((p) => p.customer === null || p.proposedMatch === null)
       .map((p) => p.id);
     prisma.customerMatchProposal.deleteMany({
